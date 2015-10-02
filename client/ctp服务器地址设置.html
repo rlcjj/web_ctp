@@ -12,23 +12,21 @@
             from browser import document, alert, html
             from browser.local_storage import storage as store
 
-            import datetime
-
             if 'ctp_server' in store:
                 document['zone'].value = store['ctp_server']
             else:
                 document['zone'].value = 'localhost'
 
-            def echo(ev):
+            def save(ev):
                 address = document['zone'].value
                 document['console'].clear()
-                document['console'] <= "¸üĞÂµØÖ·Îª: "+address
+                document['console'] <= "æ›´æ–°åœ°å€ä¸º: "+address
                 store['ctp_server'] = address
 
-            document['mybutton'].bind('click', echo)
+            document['mybutton'].bind('click', save)
             </script>
 
-            <input id="zone" value="localhost"/><button id="mybutton">¸üĞÂ·şÎñÆ÷µØÖ·!</button>
+            <input id="zone"/><button id="mybutton">æ›´æ–°æœåŠ¡å™¨åœ°å€!</button>
 
             <div id="console"/>
 
