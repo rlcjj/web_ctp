@@ -1,0 +1,2 @@
+python ws.py
+pause

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<head>
+<link rel="stylesheet" href="src/css.css" />
+<meta charset="utf-8">
+        <script type="text/javascript" 
+    		src="src/brython.js">
+	    </script>
+        </head>
+
+        <body onload="brython()">
+
+        <script type="text/python">
+            from browser import document, alert, html, websocket
+            from browser.local_storage import storage
+
+            if 'ctp_server' in storage:
+                document['ctpserver'] <= storage['ctp_server']
+                address = 'ws://'+storage['ctp_server']+":8080/websocket"
+            else:
+                document['ctpserver'] <= '本地'
+                address = 'ws://localhost:8080/websocket'
+
+            ws = websocket.WebSocket(address)
+
+            def msg(ev):
+                document['console'] <= ev.data
+                document['console'] <= html.HR()
+
+
+            def echo(ev):
+                ws.send("111")
+
+
+            document['ss'].bind('click',echo)
+            ws.bind('message',msg)
+        </script>
+<body>
+<div class="grid-100 align-center">
+            <h1>CTP监控终端</h1>
+            <div>
+            连接至:<label id="ctpserver"/>
+            </div>
+<hr/>
+<div class="grid-50 grid-parent">
+  <p class="grid-100 align-center">
+    <b>
+      行情显示
+    </b>
+  </p>
+  <div class="grid-100 align-center" id="hangqing">
+        ...
+  </div>
+<br/>
+<hr/>
+</div>
+<div class="grid-50 grid-parent">
+  <p class="grid-100 align-center">
+    <b>
+      账户净值
+    </b>
+  </p>
+  <div class="grid-100 align-center" id="account">
+        ...
+  </div>
+<br/>
+<hr/>
+</div>
+<div class="grid-100 grid-parent">
+  <div class="grid-33 align-left">
+    <section class="example-block">
+      <b>成交</b>
+      <span class="dynamic-px-width"></span>
+      <div id="trade">
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+        </div>
+    </section>
+  </div>
+  <div class="grid-33 align-center" style="background-color:#ccc;">
+    <section class="example-block">
+      <b>报单</b>
+      <span class="dynamic-px-width"></span>
+      <div id="order">
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+        </div>
+    </section>
+  </div>
+  <div class="grid-33 align-right">
+    <section class="example-block">
+      <b>日志</b>
+      <span class="dynamic-px-width"></span>
+      <div id="log">
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
+        </div>
+    </section>
+  </div>
+</div>
+</div>
+
+        </body>
+
+    </html>

@@ -1,0 +1,37 @@
+    <html>
+
+        <head>
+        <script type="text/javascript" 
+    		src="src/brython.js">
+	</script>
+        </head>
+
+        <body onload="brython()">
+
+            <script type="text/python">
+            from browser import document, alert, html
+            from browser.local_storage import storage as store
+
+            import datetime
+
+            if 'ctp_server' in store:
+                document['zone'].value = store['ctp_server']
+            else:
+                document['zone'].value = 'localhost'
+
+            def echo(ev):
+                address = document['zone'].value
+                document['console'].clear()
+                document['console'] <= "更新地址为: "+address
+                store['ctp_server'] = address
+
+            document['mybutton'].bind('click', echo)
+            </script>
+
+            <input id="zone" value="localhost"/><button id="mybutton">更新服务器地址!</button>
+
+            <div id="console"/>
+
+        </body>
+
+    </html>
