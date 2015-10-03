@@ -23,11 +23,12 @@ class MainEngine:
     """主引擎，负责对API的调度"""
 
     #----------------------------------------------------------------------
-    def __init__(self, ws, userid, password, brokerid, mdAddress, tdAddress):
+    def __init__(self, ws, userid, password, brokerid, mdAddress, tdAddress, justCopySignal=False):
         """Constructor
         :type self: object
         """
         self.ee = EventEngine(ws)         # 创建事件驱动引擎
+        self.justCopySignal = justCopySignal
 
         self.userid = userid
         self.password = password
@@ -184,7 +185,10 @@ class MainEngine:
         self.ask = _data['AskPrice1']
         self.bid = _data['BidPrice1']
         price = (self.ask+self.bid)/2.0
-        self.socket.send(bytes(str(price)))
+        if self.justCopySignal:
+            self.socket.send(bytes("result_get"))
+        else:
+            self.socket.send(bytes(str(price)))
         _bk = int(self.socket.recv())
         self.todo = _bk
 #        print '%.0f  %s  =  %d'%(time(),_data['LastPrice'],_bk)

@@ -10,6 +10,12 @@ me = set()
 account = dict()
 funcs = dict()
 
+def ws_ctpaccount(data):
+    global account
+    account = json.loads(data)
+    for one in account:
+        me.add(MainEngine(cs,one['userid'],one['password'],one['brokerid'],one['mdfront'],one['tdfront']))
+
 @get('/')
 def index():
     return template('index')
@@ -26,6 +32,8 @@ def echo(ws):
     while True:
         msg = ws.receive()
         if msg is not None:
+            type_,data_ = msg.split('=')
+            if type_ in funcs:funcs[type_](data_)
             ws.send(msg)
         else: break
 

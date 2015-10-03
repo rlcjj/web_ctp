@@ -29,7 +29,7 @@
                 _acc[one['account']] = one
                 store['ctp_account'] = json.dumps(_acc)
                 document['console'].clear()
-                document['console'] <= "账号["+one['account']+"]添加成功"
+                document['console'] <= "账号["+one['account']+"]设置成功"
 
             def save(ev):
                 address = document['zone'].value
@@ -51,7 +51,7 @@
                 _acc = json.loads(store['ctp_account'])
                 _acc.pop(ev.target.id)
                 store['ctp_account'] = json.dumps(_acc)
-                document['console']<= "账户"+ev.target.id+"已删除"
+                document['console']<= "账号"+ev.target.id+"已删除"
 
             if 'ctp_account' in store:
                 _acc = json.loads(store['ctp_account'])
