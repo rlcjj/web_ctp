@@ -17,8 +17,7 @@
             count = 100
 
             def add_log(content):
-                count['log'] = count['log']+1
-                some = html.DIV(html.LABEL(content+"_"+str(count['log']),id=str(count['log']))+html.HR())
+                some = html.DIV(html.LABEL(content)+html.HR())
                 _l = document['log'].children
                 document['log'].clear()
                 document['log']<=some
