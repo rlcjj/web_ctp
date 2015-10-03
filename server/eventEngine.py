@@ -9,6 +9,7 @@ from threading import Thread
 
 # 自己开发的模块
 from eventType import *
+import json
 
 
 ########################################################################
@@ -50,7 +51,7 @@ class EventEngine:
     """
 
     #----------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self,websocket = None):
         """初始化事件引擎"""
         # 事件队列
         self.__queue = Queue()
@@ -58,6 +59,11 @@ class EventEngine:
         
         # 事件引擎开关
         self.__active = False
+        self.__sendout = False
+        if websocket:
+            self.__sendout = True
+            self.__ws = websocket
+
         
         # 事件处理线程
         self.__thread = Thread(target = self.__run)
@@ -84,6 +90,11 @@ class EventEngine:
     def __process(self, event):
         """处理事件"""
         # 检查是否存在对该事件进行监听的处理函数
+        if self.__sendout:
+            if '_' not in event.type_:
+                _json = json.dumps(event.dict_)
+                for _ws_ in self.__ws:
+                    _ws_.send(_json)
         if event.type_ in self.__handlers:
             #若存在，则按顺序将事件传递给处理函数执行
             [handler(event) for handler in self.__handlers[event.type_]]
@@ -160,6 +171,7 @@ class EventEngine:
     #----------------------------------------------------------------------
     def put(self, event):
         """向事件队列中存入事件"""
+        event.dict_['_type_'] = event.type_
         self.__queue.put(event)
 
 

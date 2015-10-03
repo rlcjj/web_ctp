@@ -12,7 +12,7 @@ from datetime import date
 from time import sleep,time
 import shelve
 
-from PyQt4 import QtCore
+#from PyQt4 import QtCore
 
 from demoApi import *
 from eventEngine import EventEngine
@@ -23,11 +23,11 @@ class MainEngine:
     """主引擎，负责对API的调度"""
 
     #----------------------------------------------------------------------
-    def __init__(self, userid, password, brokerid, mdAddress, tdAddress):
+    def __init__(self, ws, userid, password, brokerid, mdAddress, tdAddress):
         """Constructor
         :type self: object
         """
-        self.ee = EventEngine()         # 创建事件驱动引擎
+        self.ee = EventEngine(ws)         # 创建事件驱动引擎
 
         self.userid = userid
         self.password = password

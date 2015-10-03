@@ -18,21 +18,21 @@ EVENT_LOG = 'eLog'                      # 日志事件，通常使用某个监�
 EVENT_TDLOGIN = 'eTdLogin'                  # 交易服务器登录成功事件
 
 EVENT_MARKETDATA = 'eMarketData'            # 行情推送事件
-EVENT_MARKETDATA_DATA = 'eMarketDataDouble'            # 行情推送事件
+EVENT_MARKETDATA_DATA = 'eMarketData_'            # 行情推送事件
 EVENT_MARKETDATA_CONTRACT = 'eMarketData.'  # 特定合约的行情事件
 
 EVENT_TRADE = 'eTrade'                      # 成交推送事件
-EVENT_TRADE_DATA = 'eTradeData'                      # 成交推送事件
+EVENT_TRADE_DATA = 'eTrade_'                      # 成交推送事件
 EVENT_TRADE_CONTRACT = 'eTrade.'            # 特定合约的成交事件
 
 EVENT_ERROR = 'eError'                      # Error推送事件
 
 EVENT_ORDER = 'eOrder'                      # 报单推送事件
-EVENT_ORDER_DATA = 'eOrderData'                      # 报单推送事件
+EVENT_ORDER_DATA = 'eOrder_'                      # 报单推送事件
 EVENT_ORDER_ORDERREF = 'eOrder.'            # 特定报单号的报单事件
 
 EVENT_POSITION = 'ePosition'                # 持仓查询回报事件
-EVENT_POSITION_DATA = 'ePositionData'                # 持仓查询回报事件 for position func
+EVENT_POSITION_DATA = 'ePosition_'                # 持仓查询回报事件 for position func
 
 EVENT_INSTRUMENT = 'eInstrument'            # 合约查询回报事件
 EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件

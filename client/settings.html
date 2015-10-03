@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+        <script type="text/javascript"
+    		src="src/brython.js">
+	</script>
+        </head>
+
+        <body onload="brython()">
+
+            <script type="text/python">
+            from browser import document, alert, html
+            from browser.local_storage import storage as store
+            import json
+
+            if 'ctp_server' in store:
+                document['zone'].value = store['ctp_server']
+            else:
+                document['zone'].value = 'localhost'
+
+            def addnew(ev):
+                one = {}
+                for _k in ["account","password","mdfront","tdfront","brokerid"]:
+                    one[_k] = document[_k].value
+                if 'ctp_account' in store:
+                    _acc = json.loads(store['ctp_account'])
+                else:
+                    _acc = {}
+                _acc[one['account']] = one
+                store['ctp_account'] = json.dumps(_acc)
+                document['console'].clear()
+                document['console'] <= "账号["+one['account']+"]添加成功"
+
+            def save(ev):
+                address = document['zone'].value
+                document['console'].clear()
+                document['console'] <= "更新地址为: "+address
+                store['ctp_server'] = address
+
+            def updatectp(ev):
+                _acc = json.loads(store['ctp_account'])
+                _one = _acc[ev.target.id]
+                for _k in ['mdfront','tdfront','account','brokerid']:
+                    document[_k].value = _one[_k]
+                document['new'].set_text("更新账户"+ev.target.id)
+            def delctp(ev):
+                _all = document['ctp'].children
+                for one in _all:
+                    if one.id ==  ev.target.id:
+                        document['ctp'].remove(one)
+                _acc = json.loads(store['ctp_account'])
+                _acc.pop(ev.target.id)
+                store['ctp_account'] = json.dumps(_acc)
+                document['console']<= "账户"+ev.target.id+"已删除"
+
+            if 'ctp_account' in store:
+                _acc = json.loads(store['ctp_account'])
+                for one in _acc.values():
+                    _text = "账号:%(account)s 行情服务器:%(mdfront)s 交易服务器:%(tdfront)s 柜台ID:%(brokerid)s"%one
+                    _btn1 = html.BUTTON("更新",id=one['account'])
+                    _btn1.bind('click',updatectp)
+                    _btn2 = html.BUTTON("删除",id=one['account'])
+                    _btn2.bind('click',delctp)
+                    _div = html.DIV(id=one['account'])
+                    _div <= _btn1+_btn2+_text+html.HR()
+                    document['ctp'] <= _div
+
+            newer = html.DIV()
+            nmd = html.INPUT(id="mdfront")
+            nmd.value=""
+            newer<= nmd+"行情前置服务器(mdfront)"+html.BR()
+            nmd = html.INPUT(id="tdfront")
+            nmd.value=""
+            newer<= nmd+"交易前置服务器(tdfront)"+html.BR()
+            nmd = html.INPUT(id="brokerid")
+            nmd.value=""
+            newer<= nmd+"柜台ID"+html.BR()
+            nmd = html.INPUT(id="account")
+            nmd.value=""
+            newer<= nmd+"账号"+html.BR()
+            nmd = html.INPUT(id="password")
+            nmd.value=""
+            newer<= nmd+"密码"+html.BR()
+            nbtn = html.BUTTON("添加",id="new")
+            nbtn.bind('click',addnew)
+            newer<= nbtn
+            document['ctp'] <= newer
+
+            document['mybutton'].bind('click', save)
+            </script>
+            <a href="ctp.html"><=返回ctp监控终端</a>            <div id="console"></div>
+            <hr>
+            <input id="zone"/><button id="mybutton">更新服务器地址!</button>
+            <hr/>
+            <div id="ctp"></div>
+
+
+        </body>
+
+    </html>

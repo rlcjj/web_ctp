@@ -12,34 +12,51 @@
         <script type="text/python">
             from browser import document, alert, html, websocket
             from browser.local_storage import storage
+            import json
+
+            count = {}
+            count['log'] = 0
+
+            def add_log(content):
+                count['log'] = count['log']+1
+                some = html.DIV(html.LABEL(content+"_"+str(count['log']),id=str(count['log']))+html.HR())
+                _l = document['log'].children
+                document['log'].clear()
+                document['log']<=some
+                for one in _l[:5]:
+                    document['log']<=one
 
             if 'ctp_server' in storage:
-                document['ctpserver'] <= storage['ctp_server']
+                add_log("连接至"+storage['ctp_server'])
                 address = 'ws://'+storage['ctp_server']+":8080/websocket"
             else:
-                document['ctpserver'] <= '本地'
+                add_log("连接至本地")
                 address = 'ws://localhost:8080/websocket'
 
             ws = websocket.WebSocket(address)
 
             def msg(ev):
-                document['console'] <= ev.data
-                document['console'] <= html.HR()
+                add_log(ev.data[:10])
 
 
-            def echo(ev):
-                ws.send("111")
+            def connect(ev):
+                if 'ctp_account' in storage:
+                    _acc = json.loads(storage['ctp_account'])
+                    if _acc:
+                        ws.send("ws_ctpaccount="+storage['ctp_account'])
+                    else:
+                        add_log(html.A("请先设置ctp信息",href="settings.html"))
+                else:
+                    add_log(html.A("请先设置ctp信息",href="settings.html"))
 
 
-            document['ss'].bind('click',echo)
+            document['btn_connect'].bind('click',connect)
             ws.bind('message',msg)
         </script>
 <body>
 <div class="grid-100 align-center">
             <h1>CTP监控终端</h1>
-            <div>
-            连接至:<label id="ctpserver"/>
-            </div>
+                <input type="button" id="btn_connect" value="启动ctp..."/>
 <hr/>
 <div class="grid-50 grid-parent">
   <p class="grid-100 align-center">
@@ -94,12 +111,7 @@
     <section class="example-block">
       <b>日志</b>
       <span class="dynamic-px-width"></span>
-      <div id="log">
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-        </div>
+      <div id="log"/>
     </section>
   </div>
 </div>
