@@ -23,21 +23,21 @@ class MainEngine:
     """主引擎，负责对API的调度"""
 
     #----------------------------------------------------------------------
-    def __init__(self, ws, userid, password, brokerid, mdAddress, tdAddress, justCopySignal=False):
+    def __init__(self, ws, account, justCopySignal=False):
         """Constructor
         :type self: object
         """
-        self.ee = EventEngine(ws)         # 创建事件驱动引擎
+        self.ee = EventEngine(account,ws)         # 创建事件驱动引擎
         self.justCopySignal = justCopySignal
 
-        self.userid = userid
-        self.password = password
-        self.brokerid = brokerid
-        self.mdaddress = mdAddress
-        self.tdaddress = tdAddress
+        self.userid = account['userid']
+        self.password = account['password']
+        self.brokerid = account['brokerid']
+        self.mdaddress = account['mdAddress']
+        self.tdaddress = account['tdAddress']
 
-        self.md = DemoMdApi(self.ee, mdAddress, userid, password, brokerid)    # 创建API接口
-        self.td = DemoTdApi(self.ee, tdAddress, userid, password, brokerid)
+        self.md = DemoMdApi(self.ee, self.mdaddress, self.userid, self.password, self.brokerid)    # 创建API接口
+        self.td = DemoTdApi(self.ee, self.tdaddress, self.userid, self.password, self.brokerid)
 
         self.ee.start()                 # 启动事件驱动引擎
         self.havedposi = False

@@ -20,16 +20,16 @@
 
             def addnew(ev):
                 one = {}
-                for _k in ["account","password","mdfront","tdfront","brokerid"]:
+                for _k in ["userid","password","mdfront","tdfront","brokerid"]:
                     one[_k] = document[_k].value
                 if 'ctp_account' in store:
                     _acc = json.loads(store['ctp_account'])
                 else:
                     _acc = {}
-                _acc[one['account']] = one
+                _acc[one['userid']] = one
                 store['ctp_account'] = json.dumps(_acc)
                 document['console'].clear()
-                document['console'] <= "账号["+one['account']+"]设置成功"
+                document['console'] <= "账号["+one['userid']+"]设置成功"
 
             def save(ev):
                 address = document['zone'].value
@@ -40,7 +40,7 @@
             def updatectp(ev):
                 _acc = json.loads(store['ctp_account'])
                 _one = _acc[ev.target.id]
-                for _k in ['mdfront','tdfront','account','brokerid']:
+                for _k in ['mdfront','tdfront','userid','brokerid']:
                     document[_k].value = _one[_k]
                 document['new'].set_text("更新账户"+ev.target.id)
             def delctp(ev):
@@ -56,12 +56,12 @@
             if 'ctp_account' in store:
                 _acc = json.loads(store['ctp_account'])
                 for one in _acc.values():
-                    _text = "账号:%(account)s 行情服务器:%(mdfront)s 交易服务器:%(tdfront)s 柜台ID:%(brokerid)s"%one
-                    _btn1 = html.BUTTON("更新",id=one['account'])
+                    _text = "账号:%(userid)s 行情服务器:%(mdfront)s 交易服务器:%(tdfront)s 柜台ID:%(brokerid)s"%one
+                    _btn1 = html.BUTTON("更新",id=one['userid'])
                     _btn1.bind('click',updatectp)
-                    _btn2 = html.BUTTON("删除",id=one['account'])
+                    _btn2 = html.BUTTON("删除",id=one['userid'])
                     _btn2.bind('click',delctp)
-                    _div = html.DIV(id=one['account'])
+                    _div = html.DIV(id=one['userid'])
                     _div <= _btn1+_btn2+_text+html.HR()
                     document['ctp'] <= _div
 
@@ -75,7 +75,7 @@
             nmd = html.INPUT(id="brokerid")
             nmd.value=""
             newer<= nmd+"柜台ID"+html.BR()
-            nmd = html.INPUT(id="account")
+            nmd = html.INPUT(id="userid")
             nmd.value=""
             newer<= nmd+"账号"+html.BR()
             nmd = html.INPUT(id="password")

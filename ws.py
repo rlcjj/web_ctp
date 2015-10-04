@@ -1,21 +1,27 @@
-#coding:utf-8
+# encoding: UTF-8
 from bottle import get, run, template
 from bottle.ext.websocket import GeventWebSocketServer
 from bottle.ext.websocket import websocket
 from webbrowser import open_new_tab
 from demoEngine import MainEngine
-import json
+import json,time
 
 cs = set()
 me = set()
 account = dict()
-funcs = dict()
 
 def ws_ctpaccount(data):
     global account
     account = json.loads(data)
     for one in account:
-        me.add(MainEngine(cs,one['userid'],one['password'],one['brokerid'],one['mdfront'],one['tdfront']))
+        me.add(MainEngine(cs,one))
+
+timeskip = 0
+def addTimer(data):
+    global timeskip
+    if time.time()-timeskip>=1:
+        timeskip = time.time()
+        print("add timer ok")
 
 @get('/')
 def index():
@@ -26,6 +32,11 @@ def sendit():
     for one in cs:
         one.send("123")
     return "ok"
+
+funcs = {
+"ws_timer":addTimer,
+
+}
 
 @get('/websocket', apply=[websocket])
 def echo(ws):

@@ -32,14 +32,41 @@
 
             count = 100
 
-            def add_log(content):
-                some = html.DIV(html.LABEL(content)+html.HR())
-                _l = document['log'].children
-                document['log'].clear()
-                document['log']<=some
-                for one in _l[:count]:
-                    document['log']<=one
+            def width_lable(c,width):
+                s= html.LABEL(c)
+                s.style={"display":"inline-block","width":"%dpx"%width}
+                return s
 
+            def add_log(content):
+                _doc = document['log']
+                some = html.DIV(html.LABEL(str(datetime.datetime.now())[:19]+" "+content))
+                some.style={"text-align":"left"}
+                _l = _doc.children
+                _doc.clear()
+                _doc<=some
+                for one in _l[:count]:
+                    _doc<=one
+
+            def update_marketdata(content):
+                _doc = document['marketdata']
+                _l = _doc.children
+                _doc.clear()
+                some = html.DIV(html.LABEL("123"))
+                some.style={"text-align":"left"}
+                _doc<=some
+                for one in _l[:count]:
+                    _doc<=one
+
+            def update_account(content):
+                _doc = document['account']
+                _l = _doc.children
+                _str = width_lable("12311.11",100)+width_lable("123.11",100)
+                _doc.clear()
+                some = html.DIV(_str)
+                some.style={"text-align":"left"}
+                _doc<=some
+                for one in _l[:count]:
+                    _doc<=one
 
             if 'ctp_server' in storage:
                 add_log("服务器地址:"+storage['ctp_server'])
@@ -59,9 +86,8 @@
                 else:
                     add_log(ev.data)
 
-
             def circle_msg():
-                ws.send("circlemsg=%s"%datetime.datetime.now())
+                ws.send("ws_timer="+str(datetime.datetime.now()))
                 timer.set_timeout(circle_msg, 1000)
 
             def secend_one():
@@ -77,6 +103,10 @@
 
             def secend_two():
                 add_log("确认帐户信息")
+                document['marketdata'].clear()
+                document['account'].clear()
+                document['trade'].clear()
+                document['order'].clear()
                 timer.set_timeout(secend_three, 1000)
 
             def secend_three():
@@ -102,70 +132,59 @@
             ws.bind('close',ws_disconnected)
             ws.bind('open',ws_open)
             ws.bind('error',ws_error)
+
+            document["test"].bind('click',update_account)
         </script>
-<body>
-<div class="grid-100 align-center">
+        <button id="test">aaa</button>
+  <main role="main" class="grid-container">
+<div class="grid-100 mobile-grid-100">
+  <section class="example-block">
             <h1>CTP监控终端</h1>
-<hr/>
-<div class="grid-50 grid-parent">
-  <p class="grid-100 align-center">
-    <b>
-      行情显示
-    </b>
-  </p>
-  <div class="grid-100 align-center" id="hangqing">
-        ...
-  </div>
-<br/>
-<hr/>
-</div>
-<div class="grid-50 grid-parent">
-  <p class="grid-100 align-center">
-    <b>
-      账户净值
-    </b>
-  </p>
-  <div class="grid-100 align-center" id="account">
-        ...
-  </div>
-<br/>
-<hr/>
-</div>
-<div class="grid-100 grid-parent">
-  <div class="grid-33 align-left">
-    <section class="example-block">
-      <b>成交</b>
-      <span class="dynamic-px-width"></span>
-      <div id="trade">
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-        </div>
-    </section>
-  </div>
-  <div class="grid-33 align-center" style="background-color:#ccc;">
-    <section class="example-block">
-      <b>报单</b>
-      <span class="dynamic-px-width"></span>
-      <div id="order">
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-      <p><label id="aaa" class="example-block">asd</label><hr/><p/>
-        </div>
-    </section>
-  </div>
-  <div class="grid-33 align-right">
-    <section class="example-block">
-      <b>日志</b>
-      <span class="dynamic-px-width"></span>
-      <div id="log"/>
-    </section>
-  </div>
-</div>
+    <span class="dynamic-px-width"></span>
+  </section>
 </div>
 
-        </body>
+      <hr/>
 
-    </html>
+<div class="grid-70 mobile-grid-70">
+  <section class="example-block">
+        <p><b>行情显示</b></p>
+        <div style="margin:10px;" id="marketdata"/>
+    <span class="dynamic-px-width"></span>
+  </section>
+</div>
+<div class="grid-30 mobile-grid-30">
+  <section class="example-block">
+        <p><b>帐户信息</b></p>
+        <div style="margin:10px;" id="account"/>
+    <span class="dynamic-px-width"></span>
+  </section>
+</div>
+
+      <hr/>
+
+<div class="grid-33 mobile-grid-33">
+  <section class="example-block">
+        <p><b>成交</b></p>
+      <div style="margin:10px;" id="trade"/>
+    <span class="dynamic-px-width"></span>
+  </section>
+</div>
+<div class="grid-33 mobile-grid-33">
+  <section class="example-block">
+        <p><b>报单</b></p>
+      <div style="margin:10px;" id="order"/>
+    <span class="dynamic-px-width"></span>
+  </section>
+</div>
+<div class="grid-33 mobile-grid-33">
+  <section class="example-block">
+        <p><b>日志</b></p>
+      <div style="margin:10px;" id="log"/>
+    <span class="dynamic-px-width"></span>
+  </section>
+</div>
+
+  </main>
+</body>
+</html>

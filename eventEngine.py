@@ -51,7 +51,7 @@ class EventEngine:
     """
 
     #----------------------------------------------------------------------
-    def __init__(self,websocket = None):
+    def __init__(self,account,websocket = None):
         """初始化事件引擎"""
         # 事件队列
         self.__queue = Queue()
@@ -59,6 +59,7 @@ class EventEngine:
         
         # 事件引擎开关
         self.__active = False
+        self.__account = account
         self.__ws = websocket
 
         
@@ -174,6 +175,7 @@ class EventEngine:
     def put(self, event):
         """向事件队列中存入事件"""
         event.dict_['_type_'] = event.type_
+        event.dict_['_account_'] = self.__account
         self.__queue.put(event)
 
 
