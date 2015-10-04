@@ -32,7 +32,7 @@
 
             count = 100
 
-            def width_lable(c,width):
+            def width_label(c,width):
                 s= html.LABEL(c)
                 s.style={"display":"inline-block","width":"%dpx"%width}
                 return s
@@ -43,15 +43,16 @@
                 some.style={"text-align":"left"}
                 _l = _doc.children
                 _doc.clear()
-                _doc<=some
+                _l=[some]+_l
                 for one in _l[:count]:
                     _doc<=one
 
             def update_marketdata(content):
                 _doc = document['marketdata']
                 _l = _doc.children
+                _str = width_label("12311.11",100)+width_label("123.11",100)
                 _doc.clear()
-                some = html.DIV(html.LABEL("123"))
+                some = html.DIV(_str)
                 some.style={"text-align":"left"}
                 _doc<=some
                 for one in _l[:count]:
@@ -60,7 +61,7 @@
             def update_account(content):
                 _doc = document['account']
                 _l = _doc.children
-                _str = width_lable("12311.11",100)+width_lable("123.11",100)
+                _str = width_label("12311.11",100)+width_label("123.11",100)
                 _doc.clear()
                 some = html.DIV(_str)
                 some.style={"text-align":"left"}
