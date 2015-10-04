@@ -40,33 +40,46 @@
                 for one in _l[:count]:
                     document['log']<=one
 
+
             if 'ctp_server' in storage:
-                add_log("连接至"+storage['ctp_server'])
+                add_log("服务器地址:"+storage['ctp_server'])
                 address = 'ws://'+storage['ctp_server']+":8080/websocket"
             else:
-                add_log("连接至本地")
+                add_log("服务器地址:本地")
                 address = 'ws://localhost:8080/websocket'
 
             ws = websocket.WebSocket(address)
             idTimer = 1
 
-            def wsmsg(ev):
-                add_log(ev.data)
+            def ws_msg(ev):
+                _msg = json.loads(ev.data)
+                _type = _msg.get('_type_','EmptyType')
+                if _type in funcs:
+                    funcs[_type](_msg)
+                else:
+                    add_log(ev.data)
+
 
             def circle_msg():
                 ws.send("circlemsg=%s"%datetime.datetime.now())
                 timer.set_timeout(circle_msg, 1000)
 
             def secend_one():
-                add_log("2秒后启动...")
-                timer.set_timeout(secend_two, 1000)
+                if 'ctp_account' in storage:
+                    _acc = json.loads(storage['ctp_account'])
+                    if _acc:
+                        ws.send("ws_ctpaccount="+storage['ctp_account'])
+                        timer.set_timeout(secend_two, 1000)
+                    else:
+                        add_log(html.A("请先设置ctp信息",href="settings.html"))
+                else:
+                    add_log(html.A("请先设置ctp信息",href="settings.html"))
 
             def secend_two():
-                add_log("1秒后启动...")
+                add_log("确认帐户信息")
                 timer.set_timeout(secend_three, 1000)
 
             def secend_three():
-                ws.send("ok=starting")
                 add_log("启动循环消息")
                 timer.set_timeout(circle_msg, 1000)
 
@@ -74,33 +87,21 @@
                 add_log("重连ing")
                 window.location.reload()
 
-            def wsopen():
-                add_log("服务器端连接成功")
-                timer.clear_timeout(idTimer)
+            def ws_open():
+                add_log("连接服务器端")
+                timer.set_timeout(secend_one, 1000)
 
-            def wserror():
-                add_log("websocket_error")
+            def ws_error():
+                add_log("!!!websocket连接报错!!!")
 
-            def wsdisconnected():
+            def ws_disconnected():
                 add_log("服务器端断开连接,3秒后尝试重连")
                 idTimer = timer.set_timeout(reconnect, 3000)
 
-            def connect(ev):
-                if 'ctp_account' in storage:
-                    _acc = json.loads(storage['ctp_account'])
-                    if _acc:
-                        ws.send("ws_ctpaccount="+storage['ctp_account'])
-                    else:
-                        add_log(html.A("请先设置ctp信息",href="settings.html"))
-                else:
-                    add_log(html.A("请先设置ctp信息",href="settings.html"))
-
-            ws.bind('message',wsmsg)
-            ws.bind('close',wsdisconnected)
-            ws.bind('open',wsopen)
-            ws.bind('error',wserror)
-            add_log("3秒后启动...")
-            timer.set_timeout(secend_one, 1000)
+            ws.bind('message',ws_msg)
+            ws.bind('close',ws_disconnected)
+            ws.bind('open',ws_open)
+            ws.bind('error',ws_error)
         </script>
 <body>
 <div class="grid-100 align-center">

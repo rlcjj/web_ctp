@@ -1,3 +1,4 @@
+#coding:utf-8
 from bottle import get, run, template
 from bottle.ext.websocket import GeventWebSocketServer
 from bottle.ext.websocket import websocket
@@ -34,7 +35,7 @@ def echo(ws):
         one.set_ws(cs)
     print(2)
     for one in cs:
-        one.send("new_guy_coming")
+        one.send("连接服务器端成功")
     print(3)
     while True:
         msg = ws.receive()
@@ -42,9 +43,8 @@ def echo(ws):
             type_,data_ = msg.split('=')
             if type_ in funcs:funcs[type_](data_)
             print(msg,cs)
-            ws.send("msg_received")
             for one in cs:
-                one.send(msg)
+                one.send(json.dumps({"message":msg}))
         else: break
     print(4)
     cs.remove(ws)
