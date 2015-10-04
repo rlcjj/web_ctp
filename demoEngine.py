@@ -61,7 +61,7 @@ class MainEngine:
         self.ee.register(EVENT_MARKETDATA_DATA, self.get_data)
         self.ee.register(EVENT_POSITION_DATA, self.get_position)
         
-    def set_app(self,_app):self.app = _app
+    def set_ws(self,ws):self.ee.set_ws(ws)
     def get_order(self,event):
         _data = event.dict_['data']
         if _data['OrderStatus'] == '5':

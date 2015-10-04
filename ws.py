@@ -29,13 +29,28 @@ def sendit():
 @get('/websocket', apply=[websocket])
 def echo(ws):
     cs.add(ws)
+    print(1)
+    for one in me:
+        one.set_ws(cs)
+    print(2)
+    for one in cs:
+        one.send("new_guy_coming")
+    print(3)
     while True:
         msg = ws.receive()
         if msg is not None:
             type_,data_ = msg.split('=')
             if type_ in funcs:funcs[type_](data_)
-            ws.send(msg)
+            print(msg,cs)
+            ws.send("receive")
+            for one in cs:
+                one.send(msg)
         else: break
+    print(4)
+    cs.remove(ws)
+    print(5)
+    for one in me:
+        one.set_ws(cs)
 
 open_new_tab("ctp.html")
 run(host='0.0.0.0', port=8080, server=GeventWebSocketServer)

@@ -59,10 +59,7 @@ class EventEngine:
         
         # 事件引擎开关
         self.__active = False
-        self.__sendout = False
-        if websocket:
-            self.__sendout = True
-            self.__ws = websocket
+        self.__ws = websocket
 
         
         # 事件处理线程
@@ -77,6 +74,8 @@ class EventEngine:
         self.__handlers = {}
         
     #----------------------------------------------------------------------
+    def set_ws(self,ws):
+        self.__ws = ws
     def __run(self):
         """引擎运行"""
         while self.__active == True:
@@ -90,11 +89,14 @@ class EventEngine:
     def __process(self, event):
         """处理事件"""
         # 检查是否存在对该事件进行监听的处理函数
-        if self.__sendout:
-            if '_' not in event.type_:
+        if self.__ws:
+            if '_' not in event.type_:# for autotrader signal
                 _json = json.dumps(event.dict_)
                 for _ws_ in self.__ws:
-                    _ws_.send(_json)
+                    try:
+                        _ws_.send(_json)
+                    except Exception,e:
+                        print e
         if event.type_ in self.__handlers:
             #若存在，则按顺序将事件传递给处理函数执行
             [handler(event) for handler in self.__handlers[event.type_]]
