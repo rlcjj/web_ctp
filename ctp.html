@@ -10,9 +10,9 @@
         <body onload="brython()">
 
         <script type="text/python">
-            from browser import document, alert, html, websocket, timer
+            from browser import document, alert, html, websocket, timer, window
             from browser.local_storage import storage
-            import json,time
+            import json,time,datetime
 
             EVENT_LOG = 'eLog'                          # 日志事件，通常使用某个监听函数直接显示
             EVENT_MARKETDATA = 'eMarketData'            # 行情推送事件
@@ -48,9 +48,14 @@
                 address = 'ws://localhost:8080/websocket'
 
             ws = websocket.WebSocket(address)
+            idTimer = 1
 
-            def msg(ev):
+            def wsmsg(ev):
                 add_log(ev.data)
+
+            def circle_msg():
+                ws.send("circlemsg=%s"%datetime.datetime.now())
+                timer.set_timeout(circle_msg, 1000)
 
             def secend_one():
                 add_log("2秒后启动...")
@@ -62,6 +67,23 @@
 
             def secend_three():
                 ws.send("ok=starting")
+                add_log("启动循环消息")
+                timer.set_timeout(circle_msg, 1000)
+
+            def reconnect():
+                add_log("重连ing")
+                window.location.reload()
+
+            def wsopen():
+                add_log("服务器端连接成功")
+                timer.clear_timeout(idTimer)
+
+            def wserror():
+                add_log("websocket_error")
+
+            def wsdisconnected():
+                add_log("服务器端断开连接,3秒后尝试重连")
+                idTimer = timer.set_timeout(reconnect, 3000)
 
             def connect(ev):
                 if 'ctp_account' in storage:
@@ -73,7 +95,10 @@
                 else:
                     add_log(html.A("请先设置ctp信息",href="settings.html"))
 
-            ws.bind('message',msg)
+            ws.bind('message',wsmsg)
+            ws.bind('close',wsdisconnected)
+            ws.bind('open',wsopen)
+            ws.bind('error',wserror)
             add_log("3秒后启动...")
             timer.set_timeout(secend_one, 1000)
         </script>

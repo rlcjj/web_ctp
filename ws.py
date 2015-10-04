@@ -42,7 +42,7 @@ def echo(ws):
             type_,data_ = msg.split('=')
             if type_ in funcs:funcs[type_](data_)
             print(msg,cs)
-            ws.send("receive")
+            ws.send("msg_received")
             for one in cs:
                 one.send(msg)
         else: break
