@@ -1,10 +1,10 @@
 # web_ctp
 html5 websocket ctp
 
-环境搭建
+鐜鎼缓
 ========
-安装python2.7
-安装vcredist
-运行pip_install.bat
+瀹夎python2.7
+瀹夎vcredist
+杩愯pip_install.bat
 
 
