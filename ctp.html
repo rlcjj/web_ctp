@@ -35,7 +35,6 @@
             _timer = 0
 
             _background={
-               "ctp":100
             }
             count = 100
 
@@ -43,6 +42,10 @@
                 s= html.LABEL(c)
                 s.style={"display":"inline-block","width":"%dpx"%width}
                 return s
+
+            def change_color(id):
+                global _background
+                _background[id] = 100
 
             def add_log(content):
                 _doc = document['log']
@@ -55,8 +58,7 @@
                 _l=[some]+_l
                 for one in _l[:count]:
                     _doc<=one
-                global _background
-                _background[_id] = 100
+                change_color(_id)
 
             def update_marketdata(content):
                 _doc = document['marketdata']
@@ -101,8 +103,8 @@
             def circle_msg():
                 ws.send("ws_timer="+str(datetime.datetime.now()))
 
-            rafId = 0
 
+            rafId = 0
             def loop():
                 global rafId,_timer,_background
                 if time.time()-_timer>=1:
