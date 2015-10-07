@@ -16,10 +16,6 @@
             import json,time,datetime
             from browser.timer import request_animation_frame as raf
 
-            ws = None
-            alert("ok")
-            count = 100
-
             EVENT_LOG = 'eLog'                          # 日志事件，通常使用某个监听函数直接显示
             EVENT_MARKETDATA = 'eMarketData'            # 行情推送事件
             EVENT_MARKETDATA_CONTRACT = 'eMarketData.'  # 特定合约的行情事件
@@ -35,11 +31,13 @@
 
             funcs={
             }
-            background = {
-            "ctp":100,
-            }
 
-            alert("ok")
+            _timer = 0
+
+            _background={
+               "ctp":100
+            }
+            count = 100
 
             def width_label(c,width):
                 s= html.LABEL(c)
@@ -48,16 +46,17 @@
 
             def add_log(content):
                 _doc = document['log']
-                _id = "log%.3f"%time.time()
-                some = html.DIV(html.LABEL(str(datetime.datetime.now())[:19]+" "+content),id=_id)
+                _id = "log{}".format(time.time())
+                _content = html.LABEL(str(datetime.datetime.now())[11:19]+" "+content)
+                some = html.DIV(_content,id=_id)
                 some.style={"text-align":"left"}
                 _l = _doc.children
                 _doc.clear()
                 _l=[some]+_l
                 for one in _l[:count]:
                     _doc<=one
-                global background
-                background[_id] = 100
+                global _background
+                _background[_id] = 100
 
             def update_marketdata(content):
                 _doc = document['marketdata']
@@ -66,7 +65,7 @@
                 _doc.clear()
                 some = html.DIV(_str)
                 some.style={"text-align":"left"}
-                _l = [some]+_l
+                _l=[some]+_l
                 for one in _l[:count]:
                     _doc<=one
 
@@ -77,9 +76,19 @@
                 _doc.clear()
                 some = html.DIV(_str)
                 some.style={"text-align":"left"}
-                _l = [some]+_l
+                _l=[some]+_l
                 for one in _l[:count]:
                     _doc<=one
+
+            if 'ctp_server' in storage:
+                add_log("服务器地址:"+storage['ctp_server'])
+                address = 'ws://'+storage['ctp_server']+":8080/websocket"
+            else:
+                add_log("服务器地址:本地")
+                address = 'ws://localhost:8080/websocket'
+
+            ws = websocket.WebSocket(address)
+            idTimer = 1
 
             def ws_msg(ev):
                 _msg = json.loads(ev.data)
@@ -92,45 +101,44 @@
             def circle_msg():
                 ws.send("ws_timer="+str(datetime.datetime.now()))
 
-            def update_background():
-                global background
-                ws.send("ws_timer=1"))
-                global raf_id
-                ws.send("ws_timer=2"))
-                _all = background.items()
-                ws.send("ws_timer=3"))
-                background = {}
-                ws.send("ws_timer=4"))
-                for k,v in _all:
-                    if v<240:
-                        document['ctp'].set_style({"background":"#{:x}{:x}{:x}".format(v,v,v)})
-                        background[k] = v+1
-                if raf_id%10==0:
+            rafId = 0
+
+            def loop():
+                global rafId,_timer,_background
+                if time.time()-_timer>=1:
                     circle_msg()
-                raf_id = raf(update_background)
+                    _timer = int(time.time())
+                if _background:
+                    _all = _background.items()
+                    _background = {}
+                    for k,v in _all:
+                        if v<240:
+                            document[k].set_style({"background":"#{:x}{:x}{:x}".format(v,v,v)})
+                            _background[k] = v+1
+                rafId = raf(loop)
 
-            def secend_three():
-                add_log("启动循环消息")
-                update_background()
+            def step_one():
+                if 'ctp_account' in storage:
+                    _acc = json.loads(storage['ctp_account'])
+                    if _acc:
+                        ws.send("ws_ctpaccount="+storage['ctp_account'])
+                        timer.set_timeout(step_two, 1000)
+                    else:
+                        add_log(html.A("请先设置ctp信息",href="settings.html"))
+                else:
+                    add_log(html.A("请先设置ctp信息",href="settings.html"))
 
-            def secend_two():
+            def step_two():
                 add_log("确认帐户信息")
                 document['marketdata'].clear()
                 document['account'].clear()
                 document['trade'].clear()
                 document['order'].clear()
-                timer.set_timeout(secend_three, 1000)
+                timer.set_timeout(step_three, 1000)
 
-            def secend_one():
-                if 'ctp_account' in storage:
-                    _acc = json.loads(storage['ctp_account'])
-                    if _acc:
-                        ws.send("ws_ctpaccount="+storage['ctp_account'])
-                        timer.set_timeout(secend_two, 1000)
-                    else:
-                        add_log(html.A("请先设置ctp信息",href="settings.html"))
-                else:
-                    add_log(html.A("请先设置ctp信息",href="settings.html"))
+            def step_three():
+                add_log("启动循环消息")
+                timer.set_timeout(loop, 1000)
 
             def reconnect():
                 add_log("重连ing")
@@ -138,7 +146,7 @@
 
             def ws_open():
                 add_log("连接服务器端")
-                timer.set_timeout(secend_one, 1000)
+                timer.set_timeout(step_one, 1000)
 
             def ws_error():
                 add_log("!!!websocket连接报错!!!")
@@ -147,21 +155,11 @@
                 add_log("服务器端断开连接,3秒后尝试重连")
                 idTimer = timer.set_timeout(reconnect, 3000)
 
-            if 'ctp_server' in storage:
-                address = 'ws://'+storage['ctp_server']+":8080/websocket"
-            else:
-                address = 'ws://localhost:8080/websocket'
-
-            ws = websocket.WebSocket(address)
-
             ws.bind('message',ws_msg)
             ws.bind('close',ws_disconnected)
             ws.bind('open',ws_open)
             ws.bind('error',ws_error)
-
-
-            document["test"].bind('click',aaa)
-        </script>
+</script>
 <button id="test">test</button>
 
 
