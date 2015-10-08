@@ -34,7 +34,7 @@ class DemoMdApi(MdApi):
     """
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, address, userid, password, brokerid):
+    def __init__(self, eventEngine, address, userid, password, brokerid, plus_path=""):
         """
         API对象的初始化函数
         """
@@ -55,15 +55,16 @@ class DemoMdApi(MdApi):
         self.__setSubscribed = set()
         
         # 初始化.con文件的保存目录为\mdconnection，注意这个目录必须已存在，否则会报错
-        self.createFtdcMdApi(os.getcwd() + '\\md_%s_%s'%(userid,brokerid))
-        
+        self.createFtdcMdApi('md%s'%plus_path)
+
     #----------------------------------------------------------------------
     def onFrontConnected(self):
         """服务器连接"""
+
         event = Event(type_=EVENT_LOG)
         event.dict_['log'] = u'行情服务器连接成功'
         self.__eventEngine.put(event)
-        
+
         # 如果用户已经填入了用户名等等，则自动尝试连接
         if self.__userid:
             req = {}
@@ -149,7 +150,7 @@ class DemoMdApi(MdApi):
     def onRtnDepthMarketData(self, data):
         """行情推送"""
         # 行情推送收到后，同时触发常规行情事件，以及特定合约行情事件，用于满足不同类型的监听
-        
+        print("mdonrtndepthmarketdata")
         # 常规行情事件
         event1 = Event(type_=EVENT_MARKETDATA)
         event1.dict_['data'] = data
@@ -212,7 +213,7 @@ class DemoTdApi(TdApi):
     """
 
     #----------------------------------------------------------------------
-    def __init__(self, eventEngine, address, userid, password, brokerid):
+    def __init__(self, eventEngine, address, userid, password, brokerid, plus_path=""):
         """API对象的初始化函数"""
         super(DemoTdApi, self).__init__()
         
@@ -235,7 +236,7 @@ class DemoTdApi(TdApi):
         self.__dictInstrument = {}
         
         # 初始化.con文件的保存目录为\tdconnection
-        self.createFtdcTraderApi(os.getcwd() + '\\td_%s_%s'%(userid,brokerid))
+        self.createFtdcTraderApi('td%s'%plus_path)
         
     #----------------------------------------------------------------------
     def onFrontConnected(self):
@@ -433,7 +434,6 @@ class DemoTdApi(TdApi):
         选择先储存在一个本地字典中，全部收集完毕后再推送到队列中
         （由于耗时过长目前使用其他进程读取）
         """
-
         if error['ErrorID'] == 0:
             event = Event(type_=EVENT_INSTRUMENT)
             event.dict_['data'] = data
@@ -825,6 +825,7 @@ class DemoTdApi(TdApi):
     #----------------------------------------------------------------------
     def getInstrument(self):
         """查询合约"""
+        print("td.getInstrument")
         self.__reqid = self.__reqid + 1
         self.reqQryInstrument({}, self.__reqid)
         

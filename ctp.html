@@ -25,17 +25,13 @@
             EVENT_ORDER = 'eOrder'                      # 报单推送事件
             EVENT_ORDER_ORDERREF = 'eOrder.'            # 特定报单号的报单事件
             EVENT_POSITION = 'ePosition'                # 持仓查询回报事件
-            EVENT_INSTRUMENT = 'eInstrument'            # 合约查询回报事件
+            EVENT_PRODUCT = 'eProduct'                      # 合约品类更新
+            EVENT_INSTRUMENT_DETAIL = 'eInstrumentDetail'  # 合约查询
             EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件
             EVENT_ACCOUNT = 'eAccount'                  # 账户查询回报事件
 
-            funcs={
-            }
-
             _timer = 0
-
-            _background={
-            }
+            _background={}
             count = 100
 
             def width_label(c,width):
@@ -60,6 +56,27 @@
                     _doc<=one
                 change_color(_id)
 
+            if 'ctp_server' in storage:
+                add_log("服务器地址:"+storage['ctp_server'])
+                address = 'ws://'+storage['ctp_server']+":8080/websocket"
+            else:
+                add_log("服务器地址:本地")
+                address = 'ws://localhost:8080/websocket'
+
+            ws = websocket.WebSocket(address)
+            idTimer = 1
+
+            def event_log(_msg):
+                add_log(_msg['log'])
+
+            def event_product(_msg):
+                _doc = document['marketdata']
+                _dict = _msg['data']
+                for k,v in _dict.items():
+                    if k in storage.get('subProduct',['IF']):
+                        for one in v:
+                            ws.send("ws_getinstrument="+one)
+
             def update_marketdata(content):
                 _doc = document['marketdata']
                 _l = _doc.children
@@ -82,15 +99,10 @@
                 for one in _l[:count]:
                     _doc<=one
 
-            if 'ctp_server' in storage:
-                add_log("服务器地址:"+storage['ctp_server'])
-                address = 'ws://'+storage['ctp_server']+":8080/websocket"
-            else:
-                add_log("服务器地址:本地")
-                address = 'ws://localhost:8080/websocket'
-
-            ws = websocket.WebSocket(address)
-            idTimer = 1
+            funcs={
+            EVENT_LOG:event_log,
+            EVENT_PRODUCT:event_product,
+            }
 
             def ws_msg(ev):
                 _msg = json.loads(ev.data)
@@ -162,27 +174,17 @@
             ws.bind('open',ws_open)
             ws.bind('error',ws_error)
 </script>
-<button id="test">test</button>
-
+    <button id="restart">重启</button>
 
 <main role="main" class="grid-container">
 <div class="grid-100 mobile-grid-100">
-  <section class="example-block">
-            <h1 id="ctp">CTP监控终端</h1>
-    <span class="dynamic-px-width"></span>
-  </section>
-</div>
-
-      <hr/>
-
-<div class="grid-70 mobile-grid-70">
   <section class="example-block">
         <p><b>行情显示</b></p>
         <div style="margin:10px;" id="marketdata"/>
     <span class="dynamic-px-width"></span>
   </section>
 </div>
-<div class="grid-30 mobile-grid-30">
+<div class="grid-100 mobile-grid-100">
   <section class="example-block">
         <p><b>帐户信息</b></p>
         <div style="margin:10px;" id="account"/>

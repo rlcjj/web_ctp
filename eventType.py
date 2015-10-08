@@ -34,7 +34,9 @@ EVENT_ORDER_ORDERREF = 'eOrder.'            # 特定报单号的报单事件
 EVENT_POSITION = 'ePosition'                # 持仓查询回报事件
 EVENT_POSITION_DATA = 'ePosition_'                # 持仓查询回报事件 for autotrader
 
-EVENT_INSTRUMENT = 'eInstrument'            # 合约查询回报事件
+EVENT_INSTRUMENT = 'eInstrument_'            # 合约查询回报事件
+EVENT_PRODUCT = 'eProduct'                      # 合约品类更新
+EVENT_INSTRUMENT_DETAIL = 'eInstrumentDetail'  # 合约查询
 EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件
 EVENT_ACCOUNT = 'eAccount'                  # 账户查询回报事件
 

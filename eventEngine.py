@@ -92,7 +92,9 @@ class EventEngine:
         # 检查是否存在对该事件进行监听的处理函数
         if self.__ws:
             if '_' not in event.type_:# for autotrader signal
-                _json = json.dumps(event.dict_)
+                _json = json.dumps(event.dict_,ensure_ascii=False)
+                if 'log' in event.dict_:
+                    print(event.dict_['log'])
                 for _ws_ in self.__ws:
                     try:
                         _ws_.send(_json)
@@ -175,7 +177,7 @@ class EventEngine:
     def put(self, event):
         """向事件队列中存入事件"""
         event.dict_['_type_'] = event.type_
-        event.dict_['_account_'] = self.__account
+        event.dict_['_account_'] = self.__account['userid']
         self.__queue.put(event)
 
 
