@@ -10,7 +10,6 @@ from string import lowercase as _chars
 cs = set()
 me = {}
 STORE = "local_store"
-_store = shelve.open(STORE)
 
 def make_plus(accountid):
     o = ''
