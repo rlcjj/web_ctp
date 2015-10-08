@@ -37,6 +37,7 @@ class MainEngine:
         self.tdaddress = str(account['tdfront'])
 
         self.symbol = None
+        self.socket = None
         self.md = DemoMdApi(self.ee, self.mdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)    # 创建API接口
         self.td = DemoTdApi(self.ee, self.tdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)
 
@@ -55,12 +56,12 @@ class MainEngine:
         # 合约储存相关
         self.dictInstrument = {}        # 字典（保存合约查询数据）
         self.dictProduct = {}        # 字典（保存合约查询数据）
+        self.dictExchange={}
         self.ee.register(EVENT_INSTRUMENT, self.insertInstrument)
         
         self.ee.register(EVENT_TIMER, self.getAccountPosition)
         self.ee.register(EVENT_TRADE_DATA, self.get_trade)
         self.ee.register(EVENT_ORDER_DATA, self.get_order)
-        self.ee.register(EVENT_ERROR, self.get_error)
         self.ee.register(EVENT_MARKETDATA_DATA, self.get_data)
         self.ee.register(EVENT_POSITION_DATA, self.get_position)
 
@@ -178,23 +179,22 @@ class MainEngine:
             direction = defineDict["THOST_FTDC_D_Sell"]
         _ref = self.td.sendOrder(self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
-    def get_error(self,event):
-        _err = event.dict_['ErrorID']
-        self.socket.send(bytes("error_%s"%_err))
-        _bk = self.socket.recv()
-        print("ERROR",event.dict_)
-        self.__orders = {}
     def get_data(self,event):
         _data = event.dict_['data']
         self.ask = _data['AskPrice1']
         self.bid = _data['BidPrice1']
         price = (self.ask+self.bid)/2.0
-        if self.justCopySignal:
+        if self.justCopySignal and self.socket:
             self.socket.send(bytes("result_get"))
-        else:
+        elif self.socket:
             self.socket.send(bytes(str(price)))
-        _bk = int(self.socket.recv())
-        self.todo = _bk
+        else:
+            return(0)
+        if self.socket:
+            _bk = int(self.socket.recv())
+            self.todo = _bk
+        else:
+            return(0)
 #        print '%.0f  %s  =  %d'%(time(),_data['LastPrice'],_bk)
         if self.__orders:
             print(self.__orders)
@@ -269,7 +269,13 @@ class MainEngine:
     def subscribe(self, instrumentid, exchangeid):
         """订阅合约"""
         self.md.subscribe(instrumentid, exchangeid)
-        
+
+    def sub_instrument(self,inst_id):
+        if inst_id in self.dictInstrument:
+            exch_id = self.dictInstrument[inst_id]['ExchangeID']
+            self.symbol = inst_id
+            self.exchangeid = exch_id
+            self.subscribe(inst_id,exch_id)
     #----------------------------------------------------------------------
     def getAccount(self):
         """查询账户"""
@@ -285,16 +291,6 @@ class MainEngine:
         """查询持仓"""
         self.td.getPosition()
     
-    #----------------------------------------------------------------------
-    def getInstrument(self):
-        """获取合约"""
-        event = Event(type_=EVENT_LOG)
-        log = u'查询合约信息'
-        event.dict_['log'] = log
-        self.ee.put(event)          
-        
-        self.td.getInstrument()
-        
     #----------------------------------------------------------------------
     def sendOrder(self, instrumentid, exchangeid, price, pricetype, volume, direction, offset):
         """发单"""
@@ -325,28 +321,57 @@ class MainEngine:
         # 打开设定文件setting.vn
         self.getInstrument()
 #        _exchangeid = self.dictInstrument[self.symbol]['ExchangeID']
-        self.exchangeid = ""#_exchangeid
         if self.symbol:
             self.subscribe(self.symbol,self.exchangeid)
     #----------------------------------------------------------------------
     def addEventTimer(self):
         self.ee.addEventTimer()
+    #----------------------------------------------------------------------
+    def getInstrument(self):
+        """获取合约"""
+
+        f = shelve.open('instrument')
+        if f.get('date','')==date.today() and f.get('instrument',{}) and f.get('product',{}):
+            self.dictProduct = f['product']
+            self.dictInstrument = f['instrument']
+
+            event = Event(type_=EVENT_PRODUCT)
+            event.dict_['data'] = self.dictProduct
+            self.ee.put(event)
+            event = Event(type_=EVENT_LOG)
+            log = u'获取本地合约信息'
+            event.dict_['log'] = log
+            self.ee.put(event)
+        else:
+            event = Event(type_=EVENT_LOG)
+            log = u'查询合约信息'
+            event.dict_['log'] = log
+            self.ee.put(event)
+            self.td.getInstrument()
+        f.close()
+
     def insertInstrument(self, event):
         """插入合约对象"""
         data = event.dict_['data']
         last = event.dict_['last']
-        
-        self.dictInstrument[data['InstrumentID']] = data
+
         if data['ProductID'] not in self.dictProduct:
             self.dictProduct[data['ProductID']] = {}
+        if data['ExchangeID'] not in self.dictExchange:
+            self.dictExchange[data['ExchangeID']] = {}
+        if data['ProductID'] not in self.dictExchange[data['ExchangeID']]:
+            self.dictExchange[data['ExchangeID']][data['ProductID']] = {}
+        self.dictExchange[data['ExchangeID']][data['ProductID']][data['InstrumentID']] = 1
         self.dictProduct[data['ProductID']][data['InstrumentID']] = 1
+        self.dictInstrument[data['InstrumentID']] = data
 
         # 合约对象查询完成后，查询投资者信息并开始循环查询
         if last:
             # 将查询完成的合约信息保存到本地文件，今日登录可直接使用不再查询
             self.saveInstrument()
-            print("self.dictInstrument ",self.dictProduct)
-            
+            print("self.dictProduct ",self.dictProduct.keys())
+            print("self.dictExchange ",self.dictExchange.keys())
+
             event = Event(type_=EVENT_LOG)
             log = u'合约信息查询完成'
             event.dict_['log'] = log
@@ -375,14 +400,14 @@ class MainEngine:
         
         # 停止事件驱动引擎
         self.ee.stop()
-        
+
+    def __del__(self):
+        self.exit()
     #----------------------------------------------------------------------
     def saveInstrument(self):
         """保存合约属性数据"""
-        return(0)
-        f = shelve.open('setting.vn')
-        d = {}
-        d['dictInstrument'] = self.dictInstrument
-        d['date'] = date.today()
-        f['instrument'] = d
+        f = shelve.open('instrument')
+        f['instrument'] = self.dictInstrument
+        f['product'] = self.dictProduct
+        f['date'] = date.today()
         f.close()

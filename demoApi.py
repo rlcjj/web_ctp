@@ -150,7 +150,6 @@ class DemoMdApi(MdApi):
     def onRtnDepthMarketData(self, data):
         """行情推送"""
         # 行情推送收到后，同时触发常规行情事件，以及特定合约行情事件，用于满足不同类型的监听
-        print("mdonrtndepthmarketdata")
         # 常规行情事件
         event1 = Event(type_=EVENT_MARKETDATA)
         event1.dict_['data'] = data
@@ -159,12 +158,7 @@ class DemoMdApi(MdApi):
         event3 = Event(type_=EVENT_MARKETDATA_DATA)
         event3.dict_['data'] = data
         self.__eventEngine.put(event3)
-        
-        # 特定合约行情事件
-        event2 = Event(type_=(EVENT_MARKETDATA_CONTRACT+data['InstrumentID']))
-        event2.dict_['data'] = data
-        self.__eventEngine.put(event2)
-        
+
     #---------------------------------------------------------------------- 
     def onRspSubForQuoteRsp(self, data, error, n, last):
         """订阅期权询价"""
@@ -825,7 +819,6 @@ class DemoTdApi(TdApi):
     #----------------------------------------------------------------------
     def getInstrument(self):
         """查询合约"""
-        print("td.getInstrument")
         self.__reqid = self.__reqid + 1
         self.reqQryInstrument({}, self.__reqid)
         

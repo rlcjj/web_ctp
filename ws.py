@@ -25,9 +25,14 @@ def ws_ctpaccount(data):
     _store['ctp_account'] = account
     _store.close()
     for k,v in account.items():
-        _plus = make_plus(v['userid'])
-        me[k] = MainEngine(cs,v,_plus)
-        print("account "+k+" started")
+        if k not in me:
+            _plus = make_plus(v['userid'])
+            me[k] = MainEngine(cs,v,_plus)
+            print("account "+k+" started")
+
+def ws_getinstrument(data):
+    for one in me.values():
+        one.sub_instrument(data)
 
 timeskip = 0
 def addTimer(data):
@@ -50,18 +55,14 @@ def sendit():
 funcs = {
 "ws_timer":addTimer,
 "ws_ctpaccount":ws_ctpaccount,
+"ws_getinstrument":ws_getinstrument,
 }
 
 @get('/websocket', apply=[websocket])
 def echo(ws):
     cs.add(ws)
-    print(1)
     for one in me.values():
         one.set_ws(cs)
-        print(2)
-    for one in cs:
-        one.send(json.dumps({"message":"server connected"}))
-        print(3)
     while True:
         msg = ws.receive()
         if msg is not None:
@@ -71,11 +72,9 @@ def echo(ws):
             else:
                 print(msg,cs)
         else: break
-    print(4)
     cs.remove(ws)
     for one in me.values():
         one.set_ws(cs)
-        print(5)
 
 open_new_tab("ctp.html")
 run(host='0.0.0.0', port=8080, server=GeventWebSocketServer)

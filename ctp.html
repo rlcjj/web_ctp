@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <head>
 <link rel="stylesheet" href="src/css.css" />
+<link rel="shortcut icon" href="ico.ico" type="image/x-icon" />
 <meta charset="utf-8">
         <script type="text/javascript" 
     		src="src/brython.js">
@@ -41,7 +42,7 @@
 
             def change_color(id):
                 global _background
-                _background[id] = 100
+                _background[id] = 150
 
             def add_log(content):
                 _doc = document['log']
@@ -72,21 +73,43 @@
             def event_product(_msg):
                 _doc = document['marketdata']
                 _dict = _msg['data']
+                storage['product_list'] = json.dumps(_dict.keys())
                 for k,v in _dict.items():
-                    if k in storage.get('subProduct',['IF']):
-                        for one in v:
-                            ws.send("ws_getinstrument="+one)
+                    if k in storage.get('sub_product',['IF']):
+                        _min = ''
+                        for one in v.keys():
+                            if _min:
+                                _min = min(_min,one)
+                            else:
+                                _min = one
+                        ws.send("ws_getinstrument="+_min)
 
-            def update_marketdata(content):
+            def event_marketdata(_msg):
                 _doc = document['marketdata']
                 _l = _doc.children
-                _str = width_label("12311.11",100)+width_label("123.11",100)
-                _doc.clear()
-                some = html.DIV(_str)
+                _data = _msg['data']
+                _id = "marketdata"+_data['InstrumentID']
+                _content = width_label(_data['InstrumentID'],100)
+                _content += width_label("叫卖价1",50)+width_label(_data["AskPrice1"],50)+width_label(_data["AskVolume1"],50)
+                _content += width_label("叫买价1",50)+width_label(_data["BidPrice1"],50)+width_label(_data["BidVolume1"],50)
+                _content += width_label("最新价",50)
+                _content += width_label(_data["LastPrice"],50)
+                _content += width_label("持仓量",50)
+                _content += width_label(_data["Volume"],50)
+                _content += width_label(_data["UpdateTime"],50)
+                some = html.DIV(_content,id=_id)
                 some.style={"text-align":"left"}
-                _l=[some]+_l
+                _doc.clear()
+                haved = False
                 for one in _l[:count]:
-                    _doc<=one
+                    if one.id==_id:
+                        haved = True
+                        _doc <= some
+                    else:
+                        _doc <= one
+                if not haved:
+                    _doc <= some
+                change_color(_id)
 
             def update_account(content):
                 _doc = document['account']
@@ -102,6 +125,7 @@
             funcs={
             EVENT_LOG:event_log,
             EVENT_PRODUCT:event_product,
+            EVENT_MARKETDATA:event_marketdata,
             }
 
             def ws_msg(ev):
