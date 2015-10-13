@@ -52,7 +52,6 @@ def sendit():
     return "ok"
 
 funcs = {
-"ws_timer":addTimer,
 "ws_ctpaccount":ws_ctpaccount,
 "ws_getinstrument":ws_getinstrument,
 }

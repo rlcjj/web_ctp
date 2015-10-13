@@ -45,7 +45,8 @@ class MainEngine:
         self.havedposi = False
         self.position = {}
         self.todayposition = {}
-        
+
+        self.__timer = time()+300
         self.__orders = {}
         self.__retry = 0
         # 循环查询持仓和账户相关
@@ -67,6 +68,10 @@ class MainEngine:
 
         self.login()
     def set_ws(self,ws):self.ee.set_ws(ws)
+    def check_timer(self):
+        if time()>self.__timer:
+            self.ee.addEventTimer()
+            self.__timer = time()+1
     def get_order(self,event):
         _data = event.dict_['data']
         if _data['OrderStatus'] == '5':
@@ -180,6 +185,7 @@ class MainEngine:
         _ref = self.td.sendOrder(self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
     def get_data(self,event):
+        self.check_timer()
         _data = event.dict_['data']
         self.ask = _data['AskPrice1']
         self.bid = _data['BidPrice1']

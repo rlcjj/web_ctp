@@ -31,7 +31,6 @@
             EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件
             EVENT_ACCOUNT = 'eAccount'                  # 账户查询回报事件
 
-            _timer = 0
             _background={}
             count = 100
 
@@ -136,16 +135,9 @@
                 else:
                     add_log(ev.data)
 
-            def circle_msg():
-                ws.send("ws_timer="+str(datetime.datetime.now()))
-
-
             rafId = 0
             def loop():
-                global rafId,_timer,_background
-                if time.time()-_timer>=1:
-                    circle_msg()
-                    _timer = int(time.time())
+                global rafId,_background
                 if _background:
                     _all = _background.items()
                     _background = {}
