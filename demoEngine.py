@@ -49,6 +49,7 @@ class MainEngine:
         self.__timer = time()+300
         self.__orders = {}
         self.__retry = 0
+        self.__maxRetry = 5
         # 循环查询持仓和账户相关
         self.countGet = 0               # 查询延时计数
         self.lastGet = 'Account'        # 上次查询的性质
@@ -57,7 +58,7 @@ class MainEngine:
         # 合约储存相关
         self.dictInstrument = {}        # 字典（保存合约查询数据）
         self.dictProduct = {}        # 字典（保存合约查询数据）
-        self.dictExchange={}
+        self.dictExchange= {}
         self.ee.register(EVENT_INSTRUMENT, self.insertInstrument)
         
         self.ee.register(EVENT_TIMER, self.getAccountPosition)
@@ -67,7 +68,9 @@ class MainEngine:
         self.ee.register(EVENT_POSITION_DATA, self.get_position)
 
         self.login()
-    def set_ws(self,ws):self.ee.set_ws(ws)
+
+    def set_ws(self,ws):
+        self.ee.set_ws(ws)
     def check_timer(self):
         if time()>self.__timer:
             self.ee.addEventTimer()
@@ -81,10 +84,13 @@ class MainEngine:
             else:
                 self.__orders = {}
                 return 0
-            if self.__retry>5:
+            if self.__retry>=self.__maxRetry:
                 self.__retry = 0
                 return 0
-            print("Plus...Order")
+            event = Event(type_=EVENT_LOG)
+            log = u'未成交已撤单，补单'
+            event.dict_['log'] = log
+            self.ee.put(event)
             if _saved[6] == defineDict['THOST_FTDC_OF_Open']:
                 _tr = 1
             elif _saved[6] == defineDict['THOST_FTDC_OF_Close']:
@@ -114,10 +120,13 @@ class MainEngine:
             _goon = 0
         if _goon != 0:
             self.__retry += 1
-            if self.__retry>5:
+            if self.__retry>=self.__maxRetry:
                 self.__retry = 0
                 return 0
-            print("Plus...Trade")
+            event = Event(type_=EVENT_LOG)
+            log = u'未全部成交，补单'
+            event.dict_['log'] = log
+            self.ee.put(event)
             if _saved[6] == defineDict['THOST_FTDC_OF_Open']:
                 _tr = 1
             elif _saved[6] == defineDict['THOST_FTDC_OF_Close']:
@@ -150,6 +159,7 @@ class MainEngine:
         self.__orders = {}
     def openPosition(self,tr,volume):
         self.__retry = 0
+        self.countGet = 0
         offset = defineDict['THOST_FTDC_OF_Open']
         pricetype = defineDict['THOST_FTDC_OPT_LimitPrice']
         if tr>0:
@@ -162,6 +172,7 @@ class MainEngine:
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
     def closePosition(self,tr,volume):
         self.__retry = 0
+        self.countGet = 0
         offset = defineDict['THOST_FTDC_OF_Close']
         pricetype = defineDict['THOST_FTDC_OPT_LimitPrice']
         if tr<0:
@@ -174,6 +185,7 @@ class MainEngine:
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
     def closeTodayPosition(self,tr,volume):
         self.__retry = 0
+        self.countGet = 0
         offset = defineDict['THOST_FTDC_OF_CloseToday']
         pricetype = defineDict['THOST_FTDC_OPT_LimitPrice']
         if tr<0:
@@ -190,17 +202,15 @@ class MainEngine:
         self.ask = _data['AskPrice1']
         self.bid = _data['BidPrice1']
         price = (self.ask+self.bid)/2.0
-        if self.justCopySignal and self.socket:
-            self.socket.send(bytes("result_get"))
-        elif self.socket:
-            self.socket.send(bytes(str(price)))
-        else:
-            return(0)
         if self.socket:
-            _bk = int(self.socket.recv())
-            self.todo = _bk
+            if self.justCopySignal:
+                self.socket.send(bytes("result_get"))
+            else:
+                self.socket.send(bytes(str(price)))
         else:
             return(0)
+        _bk = int(self.socket.recv())
+        self.todo = _bk
 #        print '%.0f  %s  =  %d'%(time(),_data['LastPrice'],_bk)
         if self.__orders:
             print(self.__orders)
@@ -282,6 +292,10 @@ class MainEngine:
             self.symbol = inst_id
             self.exchangeid = exch_id
             self.subscribe(inst_id,exch_id)
+            event = Event(type_=EVENT_LOG)
+            log = u'订阅合约:%s'%inst_id
+            event.dict_['log'] = log
+            self.ee.put(event)
     #----------------------------------------------------------------------
     def getAccount(self):
         """查询账户"""
@@ -313,14 +327,16 @@ class MainEngine:
         self.countGet = self.countGet + 1
         
         # 每1秒发一次查询
-        if self.countGet >= 20:
+        if self.countGet >= 5:
             self.countGet = 0
             if self.lastGet == 'Account':
-                self.getPosition()
                 self.lastGet = 'Position'
+                self.getPosition()
             else:
                 self.lastGet = 'Account'
                 self.getAccount()
+        else:
+            self.getPosition()
     #----------------------------------------------------------------------
     def initGet(self, event):
         """在交易服务器登录成功后，开始初始化查询"""
