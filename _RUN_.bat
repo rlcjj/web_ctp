@@ -1,3 +1,3 @@
 del *.con
-python ws.py
+python run.py
 pause

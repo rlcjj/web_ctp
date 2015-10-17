@@ -78,8 +78,9 @@ class MainEngine:
     def set_ws(self,ws):
         self.websocket = ws
     def websocket_send(self,event):
+        _data = json.dumps(event.dict_)
         for _ws in self.websocket:
-            _ws.send(json.dumps(event.dict_))
+            _ws.send(_data)
     def check_timer(self):
         if time()>self.__timer:
             self.ee.addEventTimer()
