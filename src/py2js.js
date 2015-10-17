@@ -2575,7 +2575,7 @@ function $ForExpr(context){
             }else{
                 var start=$range.tree[0].to_js(),stop=$range.tree[1].to_js()
             }
-            var js = idt+'='+start+';'+h+'var $stop_'+num +'=$B.$GetInt('+
+            var js = idt+'='+start+';'+h+'var $stop_'+num +'=$B.int_or_bool('+
                 stop+'),'+h+
                 '    $next'+num+'= '+idt+','+h+
                 '    $safe'+num+'= typeof $next'+num+'=="number" && typeof '+
@@ -3133,6 +3133,17 @@ function $IdCtx(context,value){
         else if(val=='__BRYTHON__' || val == '$B'){return val}
 
         var innermost = $get_scope(this)
+        /*
+        if(val=='list'){
+            console.log(val, 'innermost', innermost)
+            var node = $get_node(this), scope=innermost
+            console.log('locals', node.locals)
+            while(scope){
+                console.log('locals of scope', scope.id, scope.locals)
+                scope = scope.parent_block
+            }
+        }
+        */
         var scope = innermost, found=[], module = scope.module
         
         // get global scope
@@ -3240,6 +3251,16 @@ function $IdCtx(context,value){
                     }
                 }else if(scope.id==scope.module){
                     if(!this.bound && scope===innermost && this.env[val]===undefined){
+                        var locs = $get_node(this).locals || {}
+                        if(locs[val]===undefined){
+                            // Name is bound in scope, but after the current node
+                            // If it is a builtin name, use the builtin
+                            // Cf issue #311
+                            if(found.length>1 && found[1].id == '__builtins__'){
+                                this.is_builtin = true
+                                return val+$to_js(this.tree,'')
+                            }
+                        }
                         return '$B.$search("'+val+'", $locals_'+scope.id.replace(/\./g,'_')+')'
                     }
                     val = scope_ns+'["'+val+'"]'
@@ -3448,15 +3469,13 @@ function $LambdaCtx(context){
         var module = $get_module(this)
 
         var src = $B.$py_src[module.id]
-        var qesc = new RegExp('"',"g") // to escape double quotes in arguments
-
-        var args = src.substring(this.args_start,this.body_start).replace(qesc,'\\"')
-        var body = src.substring(this.body_start+1,this.body_end).replace(qesc,'\\"')
+        
+        var qesc = new RegExp('"',"g"), // to escape double quotes in arguments
+            args = src.substring(this.args_start,this.body_start).replace(qesc,'\\"'),
+            body = src.substring(this.body_start+1,this.body_end).replace(qesc,'\\"')
         body = body.replace(/\n/g,' ')
 
-        var scope = $get_scope(this)
-        var sc = scope
-        var env = [], pos=0
+        var scope = $get_scope(this), sc = scope, env = [], pos=0
         while(sc && sc.id!=='__builtins__'){
             env[pos++]='["'+sc.id+'",$locals_'+sc.id.replace(/\./g,'_')+']'
             sc = sc.parent_block
@@ -4399,7 +4418,6 @@ function $TryCtx(context){
         // restore frames stack as before the try clause
         var frame_node = new $Node()
         var js = ';$B.frames_stack = $locals["$frame'+$loop_num+'"];'
-        js += 'delete $locals["$frame'+$loop_num+'"];'
         new $NodeJSCtx(frame_node, js)
         node.parent.insert(pos, frame_node)
         $loop_num++
@@ -6948,7 +6966,7 @@ function $tokenize(src,module,locals_id,parent_block_id,line_info){
     return root
 }
 
-$B.py2js = function(src,module,locals_id,parent_block_id, line_info){
+$B.py2js = function(src, module, locals_id, parent_block_id, line_info){
     // src = Python source (string)
     // module = module name (string)
     // locals_id = the id of the block that will be created
@@ -6968,6 +6986,7 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
     if(locals_is_module){
         locals_id = locals_id[0]
     }
+    var internal = locals_id.charAt(0)=='$'
     
     var local_ns = '$locals_'+locals_id.replace(/\./g,'_')
     
@@ -6983,7 +7002,6 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
 
     $B.type[module] = $B.type[module] || {}
     $B.type[locals_id] = $B.type[locals_id] || {}
-
     $B.$py_src[locals_id] = $B.$py_src[locals_id] || src
     var root = $tokenize(src,module,locals_id,parent_block_id,line_info)
     root.transform()
@@ -6993,38 +7011,35 @@ $B.py2js = function(src,module,locals_id,parent_block_id, line_info){
     
     js[pos++]='eval(__BRYTHON__.InjectBuiltins());\n\n'
     
+    js[pos] = 'var '
     if(locals_is_module){
-        js[pos]= 'var '+local_ns+'=$locals_'+module+', '
-    }else{
-        js[pos]='var '+local_ns+'=$B.imported["'+locals_id+'"] || {}, '
+        js[pos] += local_ns+'=$locals_'+module+', '
+    }else if(!internal){
+        js[pos] += local_ns+'=$B.imported["'+locals_id+'"] || {}, '
     }
-    js[pos++]+='$locals='+local_ns+';'
+    js[pos]+='$locals='+local_ns+';'
+
+    var offset = 0
     
-    var new_node = new $Node()
-    new $NodeJSCtx(new_node,js.join(''))
-    root.insert(0,new_node)
+    root.insert(0, $NodeJS(js.join('')))
+    offset++
 
-    // module doc string
-    var ds_node = new $Node()
-    new $NodeJSCtx(ds_node, local_ns+'["__doc__"]='+(root.doc_string||'None')+';')
-    root.insert(1,ds_node)
-    // name
-    var name_node = new $Node()
-    var lib_module = module
-    try{
-        if(module.substr(0,9)=='__main__,'){lib_module='__main__;'}
-    }catch(err){
-        alert(module)
-        throw err
+    if(!internal){
+        // module doc string
+        var ds_node = new $Node()
+        new $NodeJSCtx(ds_node, local_ns+'["__doc__"]='+(root.doc_string||'None')+';')
+        root.insert(offset++,ds_node)
+        // name
+        var name_node = new $Node()
+        var lib_module = module
+        new $NodeJSCtx(name_node,local_ns+'["__name__"]='+local_ns+'["__name__"] || "'+locals_id+'";')
+        root.insert(offset++,name_node)
+        // file
+        var file_node = new $Node()
+        new $NodeJSCtx(file_node,local_ns+'["__file__"]="'+$B.$py_module_path[module]+'";None;\n')
+        root.insert(offset++,file_node)
     }
-    new $NodeJSCtx(name_node,local_ns+'["__name__"]="'+locals_id+'";')
-    root.insert(2,name_node)
-    // file
-    var file_node = new $Node()
-    new $NodeJSCtx(file_node,local_ns+'["__file__"]="'+$B.$py_module_path[module]+'";None;\n')
-    root.insert(3,file_node)
-
-    root.insert(4, $NodeJS('$B.enter_frame(["'+locals_id+'", '+local_ns+','+
+    root.insert(offset++, $NodeJS('$B.enter_frame(["'+locals_id+'", '+local_ns+','+
         '"'+module+'", '+global_ns+']);\n'))
         
     if($B.debug>0){$add_line_num(root,null,module)}

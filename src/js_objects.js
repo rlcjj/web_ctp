@@ -210,10 +210,10 @@ $JSObjectDict.__getattribute__ = function(self,attr){
                     location.replace(args[0])
                     return
                 }
-                var res = js_attr.apply(self.js,args)
-                if(typeof res == 'object') return JSObject(res)
-                if(res===undefined) return None
-                return $B.$JS2Py(res)
+                var result = js_attr.apply(self.js,args)
+                if(typeof result == 'object') return JSObject(result)
+                if(result===undefined) return None
+                return $B.$JS2Py(result)
             }
             res.__repr__ = function(){return '<function '+attr+'>'}
             res.__str__ = function(){return '<function '+attr+'>'}
@@ -275,7 +275,7 @@ $JSObjectDict.__iter__ = function(self){
     if(window.Symbol && self.js[Symbol.iterator]!==undefined){
         // Javascript objects that support the iterable protocol, such as Map
         var items = []
-        for(var item of self.js){items.push(jsobj2pyobj(item))}
+        for(var item in self.js){ if( self.js.hasOwnProperty( item ) ) { items.push(jsobj2pyobj(item))} }
         return $B.$iterator(items, $JSObject_iterator)
     }
     return $B.$iterator(self.js,$JSObject_iterator)

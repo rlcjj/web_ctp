@@ -17,15 +17,25 @@
             import json,time,datetime
             from browser.timer import request_animation_frame as raf
 
-            EVENT_LOG = 'eLog'                          # 日志事件，通常使用某个监听函数直接显示
-            EVENT_MARKETDATA = 'eMarketData'            # 行情推送事件
-            EVENT_MARKETDATA_CONTRACT = 'eMarketData.'  # 特定合约的行情事件
+            EVENT_TIMER = '_eTimer'                  # 计时器事件，每隔1秒发送一次
+            EVENT_LOG = 'eLog'                      # 日志事件，通常使用某个监听函数直接显示
+
+            EVENT_TDLOGIN = 'eTdLogin'                  # 交易服务器登录成功事件
+
+            EVENT_TICK = 'eTick'                        # 行情推送事件
+            EVENT_TICK_JUST = 'eTick.'                        # 行情推送事件
+
             EVENT_TRADE = 'eTrade'                      # 成交推送事件
-            EVENT_TRADE_CONTRACT = 'eTrade.'            # 特定合约的成交事件
+            EVENT_TRADE_JUST = 'eTrade.'                      # 成交推送事件
+
             EVENT_ERROR = 'eError'                      # Error推送事件
+
             EVENT_ORDER = 'eOrder'                      # 报单推送事件
-            EVENT_ORDER_ORDERREF = 'eOrder.'            # 特定报单号的报单事件
+            EVENT_ORDER_JUST = 'eOrder.'                      # 报单推送事件
+
             EVENT_POSITION = 'ePosition'                # 持仓查询回报事件
+
+            EVENT_INSTRUMENT = '_eInstrument'            # 合约查询回报事件
             EVENT_PRODUCT = 'eProduct'                      # 合约品类更新
             EVENT_INSTRUMENT_DETAIL = 'eInstrumentDetail'  # 合约查询
             EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件
@@ -83,7 +93,7 @@
                                 _min = one
                         ws.send("ws_getinstrument="+_min)
 
-            def event_marketdata(_msg):
+            def event_tick(_msg):
                 _doc = document['marketdata']
                 _l = _doc.children
                 _data = _msg['data']
@@ -124,7 +134,7 @@
             funcs={
             EVENT_LOG:event_log,
             EVENT_PRODUCT:event_product,
-            EVENT_MARKETDATA:event_marketdata,
+            EVENT_TICK:event_tick,
             }
 
             def ws_msg(ev):

@@ -151,7 +151,7 @@ class DemoMdApi(MdApi):
         """行情推送"""
         # 行情推送收到后，同时触发常规行情事件，以及特定合约行情事件，用于满足不同类型的监听
         # 常规行情事件
-        event1 = Event(type_=EVENT_MARKETDATA)
+        event1 = Event(type_=EVENT_TICK)
         event1.dict_['data'] = data
         self.__eventEngine.put(event1)
         

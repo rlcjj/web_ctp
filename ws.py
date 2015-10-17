@@ -51,6 +51,7 @@ def sendit():
         import shelve,json
         f = shelve.open("debug_event_types")
         for _ee in f.values():
+            print(_ee)
             one.send(json.dumps(_ee))
         f.close()
     return "ok"

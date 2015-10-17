@@ -68,10 +68,10 @@ class MainEngine:
         self.ee.register(EVENT_TICK,        self.get_tick)
         self.ee.register(EVENT_POSITION,    self.get_position)
 
-        def msg_to_websocket(event):
-            return "_" == event[0]
-
-        self.ee.register_bool("_ws_",msg_to_websocket,self.websocket_send)
+        import eventType
+        for k,v in eventType.__dict__.items():
+            if 'EVENT_' in k and v[0]!='_':
+                self.ee.register(k,self.websocket_send)
 
         self.login()
 
@@ -298,6 +298,10 @@ class MainEngine:
     #----------------------------------------------------------------------
     def login(self):
         """登陆"""
+        event = Event(type_=EVENT_LOG)
+        log = u'启动登陆...'
+        event.dict_['log'] = log
+        self.ee.put(event)
         self.td.login()
         self.md.login()
     

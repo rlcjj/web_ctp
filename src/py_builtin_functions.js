@@ -75,7 +75,6 @@ function $builtin_base_convert_helper(obj, base) {
   if (value === undefined) {
      // need to raise an error
      throw _b_.TypeError('Error, argument must be an integer or contains an __index__ function')
-     return
   }
 
   if (value >=0) return prefix + value.toString(base);
@@ -282,60 +281,76 @@ function $eval(src, _globals, _locals){
 
     var current_frame = $B.frames_stack[$B.frames_stack.length-1]
     if(current_frame===undefined){alert('current frame undef pour '+src.substr(0,30))}
-    var current_locals_id = current_frame[0]
-    var current_locals_name = current_locals_id.replace(/\./,'_')
-    var current_globals_id = current_frame[2]
-    var current_globals_name = current_globals_id.replace(/\./,'_')
+    var current_locals_id = current_frame[0].replace(/\./,'_'),
+        current_globals_id = current_frame[2].replace(/\./,'_')
 
-    var is_exec = arguments[3]=='exec', module_name, leave = false
+    var is_exec = arguments[3]=='exec',leave = false
 
     if(src.__class__===$B.$CodeObjectDict){
         src = src.source
     }
-
-    if(_globals===undefined){
-        module_name = current_globals_name
-        $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id]
-        eval('var $locals_'+module_name+'=current_frame[3]')        
+    
+    // code will be run in a specific block
+    var globals_id = '$exec_'+$B.UUID(),
+        locals_id,
+        parent_block_id
+    if(_locals===_globals || _locals===undefined){
+        locals_id = globals_id
     }else{
-        module_name = _b_.dict.$dict.get(_globals, '__name__', 
-            'exec_'+$B.UUID())
-        $B.$py_module_path[module_name] = $B.$py_module_path[current_globals_id]
-        $B.$py_src[module_name] = src
-
-        // Initialise locals object
-        if (!$B.async_enabled) eval('var $locals_'+module_name+'={}')
-
-        // Add names/values defined in _globals
+        locals_id = '$exec_'+$B.UUID()
+    }
+    // Initialise the object for block namespaces
+    eval('var $locals_'+globals_id+' = {}')
+    eval('var $locals_'+locals_id+' = {}')
+    
+    // Initialise block globals
+    if(_globals===undefined){
+        for(var attr in current_frame[3]){
+            eval('$locals_'+globals_id+'["'+attr+
+                '"] = current_frame[3]["'+attr+'"]')
+        }
+        parent_block_id = current_globals_id
+        eval('var $locals_'+current_globals_id+'=current_frame[3]')
+    }else{
         var items = _b_.dict.$dict.items(_globals), item
         while(1){
             try{
                 var item = next(items)
-                eval('$locals_'+module_name+'["'+item[0]+'"] = item[1]')
+                eval('$locals_'+globals_id+'["'+item[0]+'"] = item[1]')
+            }catch(err){
+                break
+            }
+        }
+        parent_block_id = '__builtins__'
+    }
+
+    // Initialise block locals
+    if(_locals===undefined){
+        if(_globals!==undefined){
+            eval('var $locals_'+locals_id+' = $locals_'+globals_id)        
+        }else{
+            for(var attr in current_frame[1]){
+                eval('$locals_'+locals_id+'["'+attr+
+                    '"] = current_frame[1]["'+attr+'"]')
+            }
+        }
+    }else{
+        var items = _b_.dict.$dict.items(_locals), item
+        while(1){
+            try{
+                var item = next(items)
+                eval('$locals_'+locals_id+'["'+item[0]+'"] = item[1]')
             }catch(err){
                 break
             }
         }
     }
-    if(_locals===undefined){
-        local_name = 'exec_'+$B.UUID()
-        if(_globals !== undefined){
-            var root = $B.py2js(src,module_name,[local_name],module_name)
-        }else{
-            // Insert locals name in namespace
-            eval('$locals_'+current_locals_name+"=current_frame[1]")
-            var root = $B.py2js(src,module_name,[local_name],current_locals_id)
-        }
-    }else{
-        if(_locals.id === undefined){_locals.id = 'exec_'+$B.UUID()}
-        local_name = _locals.id
-        var root = $B.py2js(src,module_name,[module_name],local_name)
-    }
- 
-    
+        
+    var root = $B.py2js(src, globals_id, locals_id, parent_block_id)
+
     try{
         // If the Python function is eval(), not exec(), check that the source
-        // is an expression_
+        // is an expression
         if(!is_exec){
             // last instruction is 'leave frame' ; we must remove it, 
             // otherwise eval() would return None
@@ -351,35 +366,44 @@ function $eval(src, _globals, _locals){
         }
 
         var js = root.to_js()
+        
         if ($B.async_enabled) js=$B.execution_object.source_conversion(js) 
         //js=js.replace("@@", "\'", 'g')
  
+        //console.log(module_id, local_id, $B.imported[module_id])
         var res = eval(js)
+        var gns = eval('$locals_'+globals_id)
 
+        // Update _locals with the namespace after execution
+        if(_locals!==undefined){
+            var lns = eval('$locals_'+locals_id)
+            var setitem = getattr(_locals,'__setitem__')
+            for(var attr in lns){setitem(attr, lns[attr])}
+        }else{
+            for(var attr in lns){current_frame[1][attr] = lns[attr]}
+        }
+        
         if(_globals!==undefined){
             // Update _globals with the namespace after execution
-            var ns = eval('$locals_'+module_name)
             var setitem = getattr(_globals,'__setitem__')
-            for(var attr in ns){
-                setitem(attr, ns[attr])
+            for(var attr in gns){
+                setitem(attr, gns[attr])
             }
-        }
-        $B.imported[module_name] = ns
-
-        // fixme: some extra variables are bleeding into locals...
-        /*  This also causes issues for unittests */
-        if(_locals!==undefined){
-            // Update _globals with the namespace after execution
-            var ns = eval('$locals_'+local_name)
-            var setitem = getattr(_locals,'__setitem__')
-            for(var attr in ns){
-                setitem(attr, ns[attr])
+        }else{
+            for(var attr in gns){
+                current_frame[3][attr] = gns[attr]
             }
         }
         
+        // fixme: some extra variables are bleeding into locals...
+        /*  This also causes issues for unittests */
         if(res===undefined) return _b_.None
         return res
     }catch(err){
+        //console.log('eval error\n', err)
+        //console.log(js)
+        //console.log('globals ns', eval('$locals_'+globals_id),'local',
+        //    eval('$locals_'+locals_id))
         if(err.$py_error===undefined){throw $B.exception(err)}
         throw err
     }finally{
@@ -702,7 +726,7 @@ function __import__(mod_name, globals, locals, fromlist, level) {
         ['name', 'globals', 'locals', 'fromlist', 'level'],
         arguments, {globals:None, locals:None, fromlist:_b_.tuple(), level:0},
         null, null)
-    return $B.$__import__($.name, $.globals, $.locals, $.fromlist, $.level);
+    return $B.$__import__($.name, $.locals, $.fromlist);
 }
 
 //not a direct alias of prompt: input has no default value
@@ -1097,26 +1121,77 @@ var $RangeDict = {__class__:$B.$type,
 }
 
 $RangeDict.__contains__ = function(self,other){
-    var x = iter(self)
-    while(1){
+    if($RangeDict.__len__(self)==0){return false}
+    try{other = $B.int_or_bool(other)}
+    catch(err){
         try{
-            var y = $RangeDict.__next__(x)
-            if(getattr(y,'__eq__')(other)){return true}
+            if(getattr(other,'__eq__')(_b_.int(other))){other=_b_.int(other)}
+            else{return false}
         }catch(err){return false}
+    }
+    
+    var sub = $B.sub(other, self.start),
+        fl = $B.floordiv(sub, self.step),
+        res = $B.mul(self.step, fl)
+    if($B.eq(res, sub)){
+        if($B.gt(self.stop, self.start)){
+            return $B.ge(other, self.start) && $B.gt(self.stop, other)
+        }else{
+            return $B.ge(self.start, other) && $B.gt(other, self.stop)
+        }
+    }else{
+        return false
+    }
+}
+
+$RangeDict.__delattr__ = function(self, attr, value){
+    throw _b_.AttributeError('readonly attribute')
+}
+
+$RangeDict.__eq__ = function(self, other){
+    if(isinstance(other, range)){
+        var len = $RangeDict.__len__(self)
+        if(!$B.eq(len,$RangeDict.__len__(other))){return false}
+        if(len==0){return true}
+        if(!$B.eq(self.start,other.start)){return false}
+        if(len==1){return true}
+        return $B.eq(self.step, other.step)
     }
     return false
 }
 
+function compute_item(r, i){
+    var len = $RangeDict.__len__(r)
+    if(len==0){return r.start}
+    else if(i>len){return r.stop}
+    return $B.add(r.start, $B.mul(r.step, i))
+}
+
 $RangeDict.__getitem__ = function(self,rank){
+    if(isinstance(rank, _b_.slice)){
+        var norm = _b_.slice.$dict.$conv(rank, $RangeDict.__len__(self)),
+            substep = $B.mul(self.step, norm.step),
+            substart = compute_item(self, norm.start),
+            substop = compute_item(self, norm.stop)
+        return range(substart, substop, substep)
+    }
     if(typeof rank != "number") {
       rank=$B.$GetInt(rank)
     }
-    var res = self.start + rank*self.step
-    if((self.step>0 && res >= self.stop) ||
-        (self.step<0 && res < self.stop)){
+    if($B.gt(0, rank)){rank = $B.add(rank, $RangeDict.__len__(self))}
+    var res = $B.add(self.start, $B.mul(rank, self.step))
+    if(($B.gt(self.step,0) && ($B.ge(res, self.stop) || $B.gt(self.start, res))) ||
+        ($B.gt(0, self.step) && ($B.ge(self.stop, res) || $B.gt(res, self.start)))){
             throw _b_.IndexError('range object index out of range')
     }
     return res   
+}
+
+$RangeDict.__hash__ = function(self){
+    var len = $RangeDict.__len__(self)
+    if(len==0){return hash(_b_.tuple([0, None, None]))}
+    if(len==1){return hash(_b_.tuple([1, self.start, None]))}
+    return hash(_b_.tuple([len, self.start, self.step]))
 }
 
 $RangeIterator = function(obj){
@@ -1150,9 +1225,25 @@ $RangeDict.__iter__ = function(self){
 }
 
 $RangeDict.__len__ = function(self){
-    if(self.step>0) return 1+_b_.int((self.stop-1-self.start)/self.step)
-
-    return 1+_b_.int((self.start-1-self.stop)/-self.step)
+    var len
+    if($B.gt(self.step,0)){
+        if($B.ge(self.start, self.stop)){return 0}
+        // len is 1+(self.stop-self.start-1)/self.step
+        var n = $B.sub(self.stop, $B.add(1, self.start)),
+            q = $B.floordiv(n, self.step)
+        len = $B.add(1, q)
+    }else{
+        if($B.ge(self.stop, self.start)){return 0}
+        var n = $B.sub(self.start, $B.add(1, self.stop)),
+            q = $B.floordiv(n, $B.mul(-1, self.step))
+        len = $B.add(1, q)
+    }
+    //if($B.gt(len, $B.maxsise)){throw _b_.OverflowError("range len too big")}
+    if($B.maxsize===undefined){
+        $B.maxsize = $B.LongInt.$dict.__pow__($B.LongInt(2), 63)
+        $B.maxsize = $B.LongInt.$dict.__sub__($B.maxsize, 1)
+    }
+    return len
 }
 
 $RangeDict.__next__ = function(self){
@@ -1185,12 +1276,81 @@ $RangeDict.__repr__ = $RangeDict.__str__ = function(self){
     return res+')'
 }
 
+$RangeDict.__setattr__ = function(self, attr, value){
+    throw _b_.AttributeError('readonly attribute')
+}
+
+$RangeDict.descriptors = {
+    start: function(self){return self.start},
+    step: function(self){return self.step},
+    stop: function(self){return self.stop}
+}
+
+$RangeDict.count = function(self, ob){
+    if(isinstance(ob, [_b_.int, _b_.float, _b_.bool])){
+        return _b_.int($RangeDict.__contains__(self, ob))
+    }else{
+        var comp = getattr(ob, '__eq__'),
+            it = $RangeDict.__iter__(self)
+            _next = $RangeIterator.$dict.__next__,
+            nb = 0
+        while(true){
+            try{
+                if(comp(_next(it))){nb++}
+            }catch(err){
+                if(isinstance(err, _b_.StopIteration)){
+                    return nb
+                }
+                throw err
+            }
+        }
+    }
+}
+
+$RangeDict.index = function(self, other){
+    var $ = $B.args('index', 2, {self:null, other:null},['self','other'],
+        arguments,{},null,null),
+        self=$.self, other=$.other
+    if(isinstance(other, [_b_.int, _b_.float, _b_.bool])){
+        var sub = $B.sub(other, self.start),
+            fl = $B.floordiv(sub, self.step),
+            res = $B.mul(self.step, fl)
+        if($B.eq(res, sub)){
+            if(($B.gt(self.stop, self.start) && $B.ge(other, self.start) 
+                && $B.gt(self.stop, other)) ||
+                ($B.ge(self.start, self.stop) && $B.ge(self.start, other) 
+                && $B.gt(other, self.stop))){
+                    return fl
+            }else{throw _b_.ValueError(_b_.str(other)+' not in range')}
+        }else{
+            throw _b_.ValueError(_b_.str(other)+' not in range')            
+        }    
+    }else{
+        var comp = getattr(other, '__eq__'),
+            it = $RangeDict.__iter__(self),
+            _next = $RangeIterator.$dict.__next__,
+            nb = 0
+        while(true){
+            try{
+                if(comp(_next(it))){return nb}
+                nb++
+            }catch(err){
+                if(isinstance(err, _b_.StopIteration)){
+                    throw _b_.ValueError(_b_.str(other)+' not in range')
+                }
+                throw err
+            }
+        }
+    }
+}
+
+
 function range(){
     var $=$B.args('range',3,{start:null,stop:null,step:null},
         ['start','stop','step'],arguments,{stop:null,step:null},null,null),
         start=$.start,stop=$.stop,step=$.step,safe
     if(stop===null && step===null){
-        stop = $B.$GetInt(start)
+        stop = $B.int_or_bool(start)
         safe = typeof stop==="number"
         return{__class__:$RangeDict,
             start: 0,
@@ -1201,48 +1361,19 @@ function range(){
         }
     }
     if(step===null){step=1}
-    start = $B.$GetInt(start)
-    stop = $B.$GetInt(stop)
-    step = $B.$GetInt(step)
+    start = $B.int_or_bool(start)
+    stop = $B.int_or_bool(stop)
+    step = $B.int_or_bool(step)
+    if(step==0){throw _b_.ValueError("range() arg 3 must not be zero")}
     safe = (typeof start=='number' && typeof stop=='number' &&
         typeof step=='number')
     return {__class__: $RangeDict,
-        start: $B.$GetInt(start),
-        stop: $B.$GetInt(stop),
-        step: $B.$GetInt(step),
+        start: start,
+        stop: stop,
+        step: step,
         $is_range: true,
         $safe: safe
     }
-    /*   
-    start = $B.$GetInt(start)
-    stop
-    for(var i=0;i<args.length;i++){
-        if(typeof args[i]!='number'&&!isinstance(args[i],[_b_.int])||
-            !hasattr(args[i],'__index__')){
-            throw _b_.TypeError("'"+args[i]+"' object cannot be interpreted as an integer")
-        }
-    }
-    var start=0
-    var stop=0
-    var step=1
-    if(args.length==1){stop = $B.$GetInt(args[0])}
-    else if(args.length>=2){
-        start = args[0]
-        stop = args[1]
-    }
-    if(args.length>=3) step=args[2]
-    if(step==0){throw ValueError("range() arg 3 must not be zero")}
-    var res = {
-        __class__ : $RangeDict,
-        start:start,
-        stop:stop,
-        step:step,
-        $is_range:true
-    }
-    res.$safe = (typeof start=='number' && typeof stop=='number' &&
-        typeof step=='number')
-    return res
-    */
 }
 range.__class__ = $B.$factory
 range.$dict = $RangeDict
@@ -1402,9 +1533,60 @@ function setattr(obj,attr,value){
 }
 
 // slice
-var $SliceDict = {__class__:$B.$type, __name__:'slice'}
+var $SliceDict = {__class__:$B.$type, __name__:'slice', $native:true}
 
 $SliceDict.__mro__ = [$SliceDict,$ObjectDict]
+
+$SliceDict.__repr__ = $SliceDict.__str__ = function(self){
+        return 'slice('+_b_.str(self.start)+','+
+            _b_.str(self.stop)+','+_b_.str(self.step)+')'
+    }
+
+$SliceDict.__setattr__ = function(self, attr, value){
+    throw _b_.AttributeError('readonly attribute')
+}
+
+$SliceDict.$conv = function(self, len){
+    // Internal method, uses the integer len to set
+    // start, stop, step to integers
+    return {start: self.start === _b_.None ? 0 : self.start,
+        stop: self.stop === _b_.None ? len : self.stop,
+        step: self.step === _b_.None ? 1 : self.step
+    }
+}
+
+$SliceDict.$conv_for_seq = function(self, len){
+    // Internal method, uses the integer len to set
+    // start, stop, step to integers
+    var step = self.step===None ? 1 : self.step
+    if (step == 0) {
+        throw Error('ValueError : slice step cannot be zero');
+    }
+    var start, end;
+    if (self.start === None) {
+        start = step<0 ? len-1 : 0;
+    } else {
+        start = self.start;
+        if (start < 0) start += len;
+        if (start < 0) start = step<0 ? -1 : 0
+        if (start >= len) start = step<0 ? len-1 : len;
+    }
+    if (self.stop === None) {
+        stop = step<0 ? -1 : len;
+    } else {
+        stop = self.stop;
+        if (stop < 0) stop += len
+        if (stop < 0) stop = step<0 ? -1 : 0
+        if (stop >= len) stop = step<0 ? len-1 : len;
+    }
+    return {start: start, stop: stop, step: step}
+}
+
+$SliceDict.descriptors = {
+    start: function(self){return self.start},
+    step: function(self){return self.step},
+    stop: function(self){return self.stop}
+}
 
 $SliceDict.indices = function (self, length) {
   var len=$B.$GetInt(length)
@@ -1422,43 +1604,26 @@ $SliceDict.indices = function (self, length) {
 }
 
 function slice(){
-    var $ns=$B.args('slice',0,{},[],arguments,{},'args',null)
-    var args = $ns['args']
-    if(args.length>3){throw _b_.TypeError(
-        "slice expected at most 3 arguments, got "+args.length)
-    }else if(args.length==0){
-        throw _b_.TypeError('slice expected at least 1 argument, got 0')
-    }
+    var $=$B.args('slice',3,{start:null, stop:null, step:null},
+        ['start', 'stop', 'step'],arguments,{stop:null, step:null},
+        null,null),
+        start, stop, step
 
-    var start=0, stop=0, step=1
-    // If some arguments can be interpreted as integers, do the conversion
-    for(var i=0;i<args.length;i++){
-        try{args[i]=$B.$GetInt(args[i])}
-        catch(err){}
+    if($.stop===null && $.step===null){
+        start = _b_.None
+        stop = $.start
+        step = _b_.None
+    }else{
+        start = $.start
+        stop = $.stop
+        step = $.step === null ? _b_.None : $.step
     }
-    switch(args.length) {
-      case 1:
-        step = start = None
-        stop = args[0]
-        break
-      case 2:
-        start = args[0]
-        stop = args[1]
-        break
-      case 3:
-        start = args[0]
-        stop = args[1]
-        step = args[2]
-    } //switch
 
     var res = {
         __class__ : $SliceDict,
         start:start,
         stop:stop,
         step:step
-    }
-    res.__repr__ = res.__str__ = function(){
-        return 'slice('+start+','+stop+','+step+')'
     }
     return res
 }
@@ -2100,7 +2265,7 @@ $BaseExceptionDict.__getattr__ = function(self, attr){
             }
             info+='\n'
         }
-        console.log('exc info, stack length',self.$stack.length)
+        
         for(var i=0;i<self.$stack.length;i++){
             var frame = self.$stack[i]
             if(frame[1].$line_info===undefined){continue}
@@ -2319,8 +2484,8 @@ for(var i=0;i<builtin_funcs.length;i++){
 $B.builtin_funcs['$eval'] = true
 
 var other_builtins = [ 'Ellipsis', 'False',  'None', 'True', 
-'__build_class__', '__debug__', '__doc__', '__import__', '__name__', 
-'__package__', 'copyright', 'credits', 'license', 'NotImplemented', 'type']
+'__debug__', '__import__', //'__name__', '__doc__', '__package__', '__build_class__', 
+'copyright', 'credits', 'license', 'NotImplemented', 'type']
 
 var builtin_names = builtin_funcs.concat(other_builtins)
 

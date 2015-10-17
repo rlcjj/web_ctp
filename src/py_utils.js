@@ -153,17 +153,7 @@ $B.$list_comp = function(env){
     // "env" is a list of [local_name, local_ns] lists for all the enclosing
     // namespaces
 
-    var s = $B.frames_stack, locals_id, globals_id
-    for(var i=s.length-1;i>0;i--){
-        if(locals_id===undefined){locals_id=s[i][0]}
-        else if(locals_id!=globals_id){break}
-        if(globals_id===undefined){globals_id=s[i][2]}
-        locals_id = locals_id.replace(/\./g,'_')
-        globals_id = globals_id.replace(/\./g,'_')
-        eval('$locals_'+locals_id+'=s[i][1]')
-        eval('$locals_'+globals_id+'=s[i][3]')
-    }
-    
+        
     var $ix = $B.UUID()
     var $py = "x"+$ix+"=[]\n", indent = 0
     for(var $i=2, _len_$i = arguments.length; $i < _len_$i;$i++){
@@ -180,13 +170,14 @@ $B.$list_comp = function(env){
         var sc_id = '$locals_'+env[i][0].replace(/\./,'_')
         eval('var '+sc_id+'=env[i][1]')
     }
-    var local_name = env[0][0]
-    var module_env = env[env.length-1]
-    var module_name = module_env[0]
+    
+    var locals_id = env[0][0],
+        module_obj = env[env.length-1],
+        globals_id = module_obj[0]
 
     var listcomp_name = 'lc'+$ix
 
-    var $root = $B.py2js($py,module_name,listcomp_name,local_name,
+    var $root = $B.py2js($py, globals_id, listcomp_name, locals_id,
         $B.line_info)
     
     $root.caller = $B.line_info
@@ -203,7 +194,7 @@ $B.$list_comp = function(env){
     finally{
         clear(listcomp_name)
     }
-
+    
     return res
 }
 
@@ -838,31 +829,8 @@ $B.pyobject2jsobject=function (obj){
     if (_b_.hasattr(obj, '__dict__')) {
        return $B.pyobject2jsobject(_b_.getattr(obj, '__dict__'))
     }
-    throw _b_.TypeError(str(obj)+' is not JSON serializable')
-}
-
-
-// override IDBObjectStore's add, put, etc functions since we need
-// to convert python style objects to a js object type
-
-if (window.IDBObjectStore !== undefined) {
-    window.IDBObjectStore.prototype._put=window.IDBObjectStore.prototype.put
-    window.IDBObjectStore.prototype.put=function(obj, key) {
-       var myobj = $B.pyobject2jsobject(obj)
-       return window.IDBObjectStore.prototype._put.apply(this, [myobj, key]);
-    }
-    
-    window.IDBObjectStore.prototype._add=window.IDBObjectStore.prototype.add
-    window.IDBObjectStore.prototype.add=function(obj, key) {
-       var myobj= $B.pyobject2jsobject(obj);
-       return window.IDBObjectStore.prototype._add.apply(this, [myobj, key]);
-    }
-}
-
-if (window.IDBRequest !== undefined) {
-    window.IDBRequest.prototype.pyresult=function() {
-       return $B.jsobject2pyobject(this.result);
-    }
+    console.log('error', obj)
+    throw _b_.TypeError(_b_.str(obj)+' is not JSON serializable')
 }
 
 $B.set_line = function(line_num,module_name){
@@ -1024,7 +992,22 @@ $B.$GetInt=function(value) {
       "' object cannot be interpreted as an integer")
 }
 
+$B.int_or_bool = function(v){
+    switch(typeof v){
+        case "bool":
+            return v ? 1 : 0
+        case "number":
+            return v
+        case "object":
+            if(v.__class__===$B.LongInt.$dict){return v}
+        default:
+            throw _b_.TypeError("'"+$B.get_class(v).__name__+
+                "' object cannot be interpreted as an integer")
+    }
+}
+
 $B.enter_frame = function(frame){
+    if($B.frames_stack===undefined){alert('frames stack udef')}
     $B.frames_stack[$B.frames_stack.length]=frame
 }
 
@@ -1056,12 +1039,30 @@ $B.add = function(x,y){
         return res
     }else{return z}
 }
+
 $B.div = function(x,y){
     var z = x/y
     if(x>min_int && x<max_int && y>min_int && y<max_int
         && z>min_int && z<max_int){return z}
-    else{return z}
+    else{
+        return $B.LongInt.$dict.__truediv__($B.LongInt(x), $B.LongInt(y))
+    }
 }
+
+$B.eq = function(x,y){
+    if(x>min_int && x<max_int && y>min_int && y<max_int){return x==y}
+    return $B.LongInt.$dict.__eq__($B.LongInt(x), $B.LongInt(y))
+}
+
+$B.floordiv = function(x,y){
+    var z = x/y
+    if(x>min_int && x<max_int && y>min_int && y<max_int
+        && z>min_int && z<max_int){return Math.floor(z)}
+    else{
+        return $B.LongInt.$dict.__floordiv__($B.LongInt(x), $B.LongInt(y))
+    }
+}
+
 $B.mul = function(x,y){
     var z = x*y
     if(x>min_int && x<max_int && y>min_int && y<max_int
@@ -1080,7 +1081,7 @@ $B.sub = function(x,y){
         return $B.LongInt.$dict.__sub__($B.LongInt(x), $B.LongInt(y))
     }else{return z}
 }
-// gretaer or equal
+// greater or equal
 $B.ge = function(x,y){
     if(typeof x=='number' && typeof y== 'number'){return x>=y}
     // a safe int is >= to a long int if the long int is negative
