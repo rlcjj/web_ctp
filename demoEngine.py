@@ -71,14 +71,15 @@ class MainEngine:
         import eventType
         for k,v in eventType.__dict__.items():
             if 'EVENT_' in k and v[0]!='_':
-                self.ee.register(k,self.websocket_send)
+                self.ee.register(v,self.websocket_send)
 
         self.login()
 
     def set_ws(self,ws):
         self.websocket = ws
-    def websocket_send(selfself,event):
-        [_ws.send(json.dumps(event)) for _ws in self.websocket]
+    def websocket_send(self,event):
+        for _ws in self.websocket:
+            _ws.send(json.dumps(event.dict_))
     def check_timer(self):
         if time()>self.__timer:
             self.ee.addEventTimer()
