@@ -15,55 +15,23 @@
 EVENT_TIMER = 'eTimer_'                  # 计时器事件，每隔1秒发送一次
 EVENT_LOG = 'eLog'                      # 日志事件，通常使用某个监听函数直接显示
 
-EVENT_TDLOGIN = 'eTdLogin_'                  # 交易服务器登录成功事件
+EVENT_TDLOGIN = 'eTdLogin'                  # 交易服务器登录成功事件
 
-EVENT_MARKETDATA = 'eMarketData'            # 行情推送事件
-EVENT_MARKETDATA_DATA = 'eMarketData_'      # 行情推送事件 for autotrader
-EVENT_MARKETDATA_CONTRACT = 'eMarketData.'  # 特定合约的行情事件
+EVENT_TICK = 'eTick'                        # 行情推送事件
+EVENT_TICK_JUST = 'eTick.'                        # 行情推送事件
 
 EVENT_TRADE = 'eTrade'                      # 成交推送事件
-EVENT_TRADE_DATA = 'eTrade_'                      # 成交推送事件 for autotrader
-EVENT_TRADE_CONTRACT = 'eTrade.'            # 特定合约的成交事件
+EVENT_TRADE_JUST = 'eTrade.'                      # 成交推送事件
 
 EVENT_ERROR = 'eError'                      # Error推送事件
 
 EVENT_ORDER = 'eOrder'                      # 报单推送事件
-EVENT_ORDER_DATA = 'eOrder_'                      # 报单推送事件 for autotrader
-EVENT_ORDER_ORDERREF = 'eOrder.'            # 特定报单号的报单事件
+EVENT_ORDER_JUST = 'eOrder.'                      # 报单推送事件
 
 EVENT_POSITION = 'ePosition'                # 持仓查询回报事件
-EVENT_POSITION_DATA = 'ePosition_'                # 持仓查询回报事件 for autotrader
 
 EVENT_INSTRUMENT = 'eInstrument_'            # 合约查询回报事件
 EVENT_PRODUCT = 'eProduct'                      # 合约品类更新
 EVENT_INSTRUMENT_DETAIL = 'eInstrumentDetail'  # 合约查询
 EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件
 EVENT_ACCOUNT = 'eAccount'                  # 账户查询回报事件
-
-#----------------------------------------------------------------------
-def test():
-    """检查是否存在内容重复的常量定义"""
-    check_dict = {}
-    
-    global_dict = globals()    
-    
-    for key, value in global_dict.items():
-        if '__' not in key:                       # 不检查python内置对象
-            if value in check_dict:
-                check_dict[value].append(key)
-            else:
-                check_dict[value] = [key]
-            
-    for key, value in check_dict.items():
-        if len(value)>1:
-            print u'存在重复的常量定义:' + str(key) 
-            for name in value:
-                print name
-            print ''
-        
-    print u'测试完毕'
-    
-
-# 直接运行脚本可以进行测试
-if __name__ == '__main__':
-    test()

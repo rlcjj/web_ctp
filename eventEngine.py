@@ -51,16 +51,14 @@ class EventEngine:
     """
 
     #----------------------------------------------------------------------
-    def __init__(self,account,websocket = None):
+    def __init__(self,account):
         """初始化事件引擎"""
+        self.__account = account
         # 事件队列
         self.__queue = Queue()
-        self.__queue1 = {}
-        
+
         # 事件引擎开关
         self.__active = False
-        self.__account = account
-        self.__ws = websocket
 
         
         # 事件处理线程
@@ -73,10 +71,10 @@ class EventEngine:
         # 这里的__handlers是一个字典，用来保存对应的事件调用关系
         # 其中每个键对应的值是一个列表，列表中保存了对该事件进行监听的函数功能
         self.__handlers = {}
+        self.__boolHandlers = {}
         
     #----------------------------------------------------------------------
-    def set_ws(self,ws):
-        self.__ws = ws
+    def runit(self,event):self.__process(event)
     def __run(self):
         """引擎运行"""
         while self.__active == True:
@@ -90,16 +88,9 @@ class EventEngine:
     def __process(self, event):
         """处理事件"""
         # 检查是否存在对该事件进行监听的处理函数
-        if self.__ws:
-            if '_' not in event.type_:# for autotrader signal
-                _json = json.dumps(event.dict_,ensure_ascii=False)
-                if 'log' in event.dict_:
-                    print(event.dict_['log'])
-                for _ws_ in self.__ws:
-                    try:
-                        _ws_.send(_json)
-                    except Exception,e:
-                        print e
+        for _func_ in self.__boolHandlers.values():
+            if _func_[0](event):_func_[1](event)
+
         if event.type_ in self.__handlers:
             #若存在，则按顺序将事件传递给处理函数执行
             [handler(event) for handler in self.__handlers[event.type_]]
@@ -156,6 +147,11 @@ class EventEngine:
         if handler not in handlerList:
             handlerList.append(handler)
             
+    def register_bool(self, type_name, bool_func,handler):
+        if type_name in self.__boolHandlers:
+            raise Exception(u"该事件类型已注册")
+        self.__boolHandlers[type_name] = (bool_func,handler)
+
     #----------------------------------------------------------------------
     def unregister(self, type_, handler):
         """注销事件处理函数监听"""
@@ -177,7 +173,7 @@ class EventEngine:
     def put(self, event):
         """向事件队列中存入事件"""
         event.dict_['_type_'] = event.type_
-        event.dict_['_account_'] = self.__account['userid']
+        event.dict_['_account_'] = self.__account.get('userid','')
         self.__queue.put(event)
 
 
@@ -197,21 +193,28 @@ def test():
     """测试函数"""
     import sys
     from datetime import datetime
-    '''
-    from PyQt4.QtCore import QCoreApplication
-    
+
     def simpletest(event):
-        print u'处理每秒触发的计时器事件：%s' % str(datetime.now())
-    
-    app = QCoreApplication(sys.argv)
-    
-    ee = EventEngine()
-    ee.register(EVENT_TIMER, simpletest)
-    ee.start()
-    
-    app.exec_()
-    '''
-    
+        print event.dict_
+    def boolfunc(event):
+        return event.dict_.get('int',0)>0
+
+    ee = EventEngine({})
+    ee.register_bool("test",boolfunc, simpletest)
+
+    e = Event(type_="123")
+    e.dict_['int'] = 123
+    ee.runit(e)
+
+    e = Event(type_="123")
+    e.dict_['int'] = -1
+    ee.runit(e)
+
+    e = Event(type_="123")
+    e.dict_['int'] = 11
+    ee.runit(e)
+
+
 # 直接运行脚本可以进行测试
 if __name__ == '__main__':
     test()

@@ -27,7 +27,7 @@ class MainEngine:
         """Constructor
         :type self: object
         """
-        self.ee = EventEngine(account,ws)         # 创建事件驱动引擎
+        self.ee = EventEngine(account)         # 创建事件驱动引擎
         self.justCopySignal = justCopySignal
 
         self.userid = str(account['userid'])
@@ -38,6 +38,7 @@ class MainEngine:
 
         self.symbol = None
         self.socket = None
+        self.websocket = ws             # websocket list to send msg
         self.md = DemoMdApi(self.ee, self.mdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)    # 创建API接口
         self.td = DemoTdApi(self.ee, self.tdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)
 
@@ -61,16 +62,23 @@ class MainEngine:
         self.dictExchange= {}
         self.ee.register(EVENT_INSTRUMENT, self.insertInstrument)
         
-        self.ee.register(EVENT_TIMER, self.getAccountPosition)
-        self.ee.register(EVENT_TRADE_DATA, self.get_trade)
-        self.ee.register(EVENT_ORDER_DATA, self.get_order)
-        self.ee.register(EVENT_MARKETDATA_DATA, self.get_data)
-        self.ee.register(EVENT_POSITION_DATA, self.get_position)
+        self.ee.register(EVENT_TIMER,       self.getAccountPosition)
+        self.ee.register(EVENT_TRADE,       self.get_trade)
+        self.ee.register(EVENT_ORDER,       self.get_order)
+        self.ee.register(EVENT_TICK,        self.get_tick)
+        self.ee.register(EVENT_POSITION,    self.get_position)
+
+        def msg_to_websocket(event):
+            return "_" in event
+
+        self.ee.register_bool("_ws_",msg_to_websocket,self.websocket_send)
 
         self.login()
 
     def set_ws(self,ws):
-        self.ee.set_ws(ws)
+        self.websocket = ws
+    def websocket_send(selfself,event):
+        [_ws.send(event) for _ws in self.websocket]
     def check_timer(self):
         if time()>self.__timer:
             self.ee.addEventTimer()
@@ -158,6 +166,10 @@ class MainEngine:
         self.havedposi = True
         self.__orders = {}
     def openPosition(self,tr,volume):
+        event = Event(type_=EVENT_LOG)
+        log = u'开仓'
+        event.dict_['log'] = log
+        self.ee.put(event)
         self.__retry = 0
         self.countGet = 0
         offset = defineDict['THOST_FTDC_OF_Open']
@@ -171,6 +183,10 @@ class MainEngine:
         _ref = self.td.sendOrder(self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
     def closePosition(self,tr,volume):
+        event = Event(type_=EVENT_LOG)
+        log = u'平仓'
+        event.dict_['log'] = log
+        self.ee.put(event)
         self.__retry = 0
         self.countGet = 0
         offset = defineDict['THOST_FTDC_OF_Close']
@@ -184,6 +200,10 @@ class MainEngine:
         _ref = self.td.sendOrder(self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
     def closeTodayPosition(self,tr,volume):
+        event = Event(type_=EVENT_LOG)
+        log = u'平今仓'
+        event.dict_['log'] = log
+        self.ee.put(event)
         self.__retry = 0
         self.countGet = 0
         offset = defineDict['THOST_FTDC_OF_CloseToday']
@@ -196,7 +216,7 @@ class MainEngine:
             direction = defineDict["THOST_FTDC_D_Sell"]
         _ref = self.td.sendOrder(self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
-    def get_data(self,event):
+    def get_tick(self,event):
         self.check_timer()
         _data = event.dict_['data']
         self.ask = _data['AskPrice1']

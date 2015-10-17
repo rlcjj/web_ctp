@@ -155,11 +155,7 @@ class DemoMdApi(MdApi):
         event1.dict_['data'] = data
         self.__eventEngine.put(event1)
         
-        event3 = Event(type_=EVENT_MARKETDATA_DATA)
-        event3.dict_['data'] = data
-        self.__eventEngine.put(event3)
-
-    #---------------------------------------------------------------------- 
+    #----------------------------------------------------------------------
     def onRspSubForQuoteRsp(self, data, error, n, last):
         """订阅期权询价"""
         pass
@@ -759,16 +755,7 @@ class DemoTdApi(TdApi):
         event1 = Event(type_=EVENT_ORDER)
         event1.dict_['data'] = data
         self.__eventEngine.put(event1)
-        
-        event3 = Event(type_=EVENT_ORDER_DATA)
-        event3.dict_['data'] = data
-        self.__eventEngine.put(event3)
-        
-        # 特定合约行情事件
-        event2 = Event(type_=(EVENT_ORDER_ORDERREF+data['OrderRef']))
-        event2.dict_['data'] = data
-        self.__eventEngine.put(event2)
-    
+
     #----------------------------------------------------------------------
     def onRtnTrade(self, data):
         """成交回报"""
@@ -777,15 +764,6 @@ class DemoTdApi(TdApi):
         event1.dict_['data'] = data
         self.__eventEngine.put(event1)
         
-        event3 = Event(type_=EVENT_TRADE_DATA)
-        event3.dict_['data'] = data
-        self.__eventEngine.put(event3)
-        
-        # 特定合约成交事件
-        event2 = Event(type_=(EVENT_TRADE_CONTRACT+data['InstrumentID']))
-        event2.dict_['data'] = data
-        self.__eventEngine.put(event2)
-    
     #----------------------------------------------------------------------
     def onErrRtnOrderInsert(self, data, error):
         """发单错误回报（交易所）"""
@@ -912,9 +890,6 @@ class DemoTdApi(TdApi):
             event.dict_['data'] = data
             self.__eventEngine.put(event)
             
-            event1 = Event(type_=EVENT_POSITION_DATA)
-            event1.dict_['data'] = data
-            self.__eventEngine.put(event1)
         else:
             event = Event(type_=EVENT_LOG)
             log = u'持仓查询回报，错误代码：' + unicode(error['ErrorID']) + u',' + u'错误信息：' + error['ErrorMsg'].decode('gbk')
