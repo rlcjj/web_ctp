@@ -9,9 +9,9 @@ from threading import Thread
 
 # 自己开发的模块
 from eventType import *
-import json
+import json,shelve
 
-
+_DEBUG_ = True
 ########################################################################
 class EventEngine:
     """
@@ -72,6 +72,9 @@ class EventEngine:
         # 其中每个键对应的值是一个列表，列表中保存了对该事件进行监听的函数功能
         self.__handlers = {}
         self.__boolHandlers = {}
+
+        if _DEBUG_:
+            self.save = shelve.open("debug_event_types")
         
     #----------------------------------------------------------------------
     def runit(self,event):self.__process(event)
@@ -82,7 +85,8 @@ class EventEngine:
                 event = self.__queue.get(block = True, timeout = 0.05)  # 获取事件的阻塞时间设为1秒
                 self.__process(event)
             except Empty:
-                pass
+                if _DEBUG_:
+                    self.save.sync()
             
     #----------------------------------------------------------------------
     def __process(self, event):
@@ -173,8 +177,11 @@ class EventEngine:
     def put(self, event):
         """向事件队列中存入事件"""
         event.dict_['_type_'] = event.type_
-        event.dict_['_account_'] = self.__account.get('userid','')
+        event.dict_['_account_'] = self.__account.get('userid','NONE_USERID')
         self.__queue.put(event)
+
+        if _DEBUG_:
+            self.save[event.type_] = event
 
 
 ########################################################################

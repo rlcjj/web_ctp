@@ -12,7 +12,7 @@
 '''
 
 
-EVENT_TIMER = 'eTimer_'                  # 计时器事件，每隔1秒发送一次
+EVENT_TIMER = '_eTimer'                  # 计时器事件，每隔1秒发送一次
 EVENT_LOG = 'eLog'                      # 日志事件，通常使用某个监听函数直接显示
 
 EVENT_TDLOGIN = 'eTdLogin'                  # 交易服务器登录成功事件
@@ -30,7 +30,7 @@ EVENT_ORDER_JUST = 'eOrder.'                      # 报单推送事件
 
 EVENT_POSITION = 'ePosition'                # 持仓查询回报事件
 
-EVENT_INSTRUMENT = 'eInstrument_'            # 合约查询回报事件
+EVENT_INSTRUMENT = '_eInstrument'            # 合约查询回报事件
 EVENT_PRODUCT = 'eProduct'                      # 合约品类更新
 EVENT_INSTRUMENT_DETAIL = 'eInstrumentDetail'  # 合约查询
 EVENT_INVESTOR = 'eInvestor'                # 投资者查询回报事件

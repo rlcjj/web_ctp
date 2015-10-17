@@ -10,7 +10,7 @@
 import sys
 from datetime import date
 from time import sleep,time
-import shelve
+import shelve,json
 
 #from PyQt4 import QtCore
 
@@ -69,7 +69,7 @@ class MainEngine:
         self.ee.register(EVENT_POSITION,    self.get_position)
 
         def msg_to_websocket(event):
-            return "_" in event
+            return "_" == event[0]
 
         self.ee.register_bool("_ws_",msg_to_websocket,self.websocket_send)
 
@@ -78,7 +78,7 @@ class MainEngine:
     def set_ws(self,ws):
         self.websocket = ws
     def websocket_send(selfself,event):
-        [_ws.send(event) for _ws in self.websocket]
+        [_ws.send(json.dumps(event)) for _ws in self.websocket]
     def check_timer(self):
         if time()>self.__timer:
             self.ee.addEventTimer()

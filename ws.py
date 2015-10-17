@@ -48,7 +48,11 @@ def index():
 @get('/test')
 def sendit():
     for one in cs:
-        one.send("123")
+        import shelve,json
+        f = shelve.open("debug_event_types")
+        for _ee in f.values():
+            one.send(json.dumps(_ee))
+        f.close()
     return "ok"
 
 funcs = {
