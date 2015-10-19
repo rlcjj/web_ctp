@@ -36,6 +36,7 @@ class MainEngine:
         self.mdaddress = str(account['mdfront'])
         self.tdaddress = str(account['tdfront'])
 
+        self.pluspath = _plus_path
         self.symbol = None
         self.socket = None
         self.websocket = ws             # websocket list to send msg
@@ -47,7 +48,7 @@ class MainEngine:
         self.position = {}
         self.todayposition = {}
 
-        self.__timer = time()+300
+        self.__timer = time()+60
         self.__orders = {}
         self.__retry = 0
         self.__maxRetry = 5
@@ -60,6 +61,8 @@ class MainEngine:
         self.dictInstrument = {}        # 字典（保存合约查询数据）
         self.dictProduct = {}        # 字典（保存合约查询数据）
         self.dictExchange= {}
+        self.volInstrument = {}
+        self.subInstrument = set()
         self.ee.register(EVENT_INSTRUMENT, self.insertInstrument)
         
         self.ee.register(EVENT_TIMER,       self.getAccountPosition)
@@ -78,9 +81,12 @@ class MainEngine:
     def set_ws(self,ws):
         self.websocket = ws
     def websocket_send(self,event):
-        _data = json.dumps(event.dict_)
+        _data = json.dumps(event.dict_,ensure_ascii=False)
         for _ws in self.websocket:
-            _ws.send(_data)
+            try:
+                _ws.send(_data)
+            except Exception,e:
+                print(e)
     def check_timer(self):
         if time()>self.__timer:
             self.ee.addEventTimer()
@@ -315,13 +321,32 @@ class MainEngine:
     def sub_instrument(self,inst_id):
         if inst_id in self.dictInstrument:
             exch_id = self.dictInstrument[inst_id]['ExchangeID']
-            self.symbol = inst_id
-            self.exchangeid = exch_id
+            self.subInstrument.add(inst_id)
             self.subscribe(inst_id,exch_id)
             event = Event(type_=EVENT_LOG)
-            log = u'订阅合约:%s'%inst_id
+            log = u'订阅合约: %s'%inst_id
             event.dict_['log'] = log
             self.ee.put(event)
+        elif '_' in inst_id:
+            _productID,_str = inst_id.split('_')
+            _all = self.dictProduct.get(_productID,{})
+            if _str == 'master' and _all:
+                _minDate = 100000000
+                _minID = ''
+                for k,v in _all.items():
+                    _id,_date = v
+                    if _date < _minDate:
+                        _minDate = _date
+                        _minID = k
+                exch_id = self.dictInstrument[_minID]['ExchangeID']
+                self.subInstrument.add(inst_id)
+                self.subscribe(_minID,exch_id)
+                event = Event(type_=EVENT_LOG)
+                log = u'订阅(主力)合约: %s'%_minID
+                event.dict_['log'] = log
+                self.ee.put(event)
+        self.saveInstrument()
+
     #----------------------------------------------------------------------
     def getAccount(self):
         """查询账户"""
@@ -354,7 +379,8 @@ class MainEngine:
         
         # 每1秒发一次查询
         if self.countGet >= 5:
-            self.countGet = 0
+            if self.countGet>20:
+                self.countGet = 5
             if self.lastGet == 'Account':
                 self.lastGet = 'Position'
                 self.getPosition()
@@ -369,8 +395,8 @@ class MainEngine:
         # 打开设定文件setting.vn
         self.getInstrument()
 #        _exchangeid = self.dictInstrument[self.symbol]['ExchangeID']
-        if self.symbol:
-            self.subscribe(self.symbol,self.exchangeid)
+        for _inst in self.subInstrument:
+            self.sub_instrument(_inst)
     #----------------------------------------------------------------------
     def addEventTimer(self):
         self.ee.addEventTimer()
@@ -378,30 +404,55 @@ class MainEngine:
     def getInstrument(self):
         """获取合约"""
 
-        f = shelve.open('instrument')
-        if f.get('date','')==date.today() and f.get('instrument',{}) and f.get('product',{}):
+        event = Event(type_=EVENT_LOG)
+        log = u'获取合约...'
+        event.dict_['log'] = log
+        self.ee.put(event)
+        f = shelve.open(self.pluspath+'instrument')
+        if f.get('date','')==date.today() and f.get('instrument',{}) and f.get('product',{}) and f.get('exchange',{}):
             self.dictProduct = f['product']
             self.dictInstrument = f['instrument']
+            self.dictExchange = f['exchange']
+            self.volInstrument = f.get('volinstrument',{})
+            self.subInstrument = f.get('subinstrument',set())
+
+            self.product_print()
 
             event = Event(type_=EVENT_PRODUCT)
             event.dict_['data'] = self.dictProduct
             self.ee.put(event)
             event = Event(type_=EVENT_LOG)
-            log = u'获取本地合约信息'
+            log = u'得到本地合约!'
             event.dict_['log'] = log
             self.ee.put(event)
         else:
             event = Event(type_=EVENT_LOG)
-            log = u'查询合约信息'
+            log = u'查询合约信息...'
             event.dict_['log'] = log
             self.ee.put(event)
             self.td.getInstrument()
         f.close()
-
+    def product_print(self):
+        print("self.dictExchange ",self.dictExchange.keys())
+        return(0)
+        for k,v in self.dictProduct.items():
+            print(k)
+            for _inst,_data in v.items():
+                print("  "+_inst+" : "+self.dictInstrument[_inst]['InstrumentName'])
+                data = self.dictInstrument[_inst]
+        print data
     def insertInstrument(self, event):
         """插入合约对象"""
         data = event.dict_['data']
         last = event.dict_['last']
+
+        _new = {}
+        for k,v in data.items():
+            if type(v) == type(''):
+                _new[k] = v.decode('GBK')
+            else:
+                _new[k] = v
+        data = _new
 
         if data['ProductID'] not in self.dictProduct:
             self.dictProduct[data['ProductID']] = {}
@@ -409,19 +460,20 @@ class MainEngine:
             self.dictExchange[data['ExchangeID']] = {}
         if data['ProductID'] not in self.dictExchange[data['ExchangeID']]:
             self.dictExchange[data['ExchangeID']][data['ProductID']] = {}
-        self.dictExchange[data['ExchangeID']][data['ProductID']][data['InstrumentID']] = 1
-        self.dictProduct[data['ProductID']][data['InstrumentID']] = 1
-        self.dictInstrument[data['InstrumentID']] = data
+        if data['ProductID'] in data['InstrumentID'] and data['IsTrading']==1:
+            self.dictExchange[data['ExchangeID']][data['ProductID']][data['InstrumentID']] = 1
+            self.dictProduct[data['ProductID']][data['InstrumentID']] = (data['InstrumentName'],int(data['ExpireDate']))
+            self.dictInstrument[data['InstrumentID']] = data
 
         # 合约对象查询完成后，查询投资者信息并开始循环查询
         if last:
             # 将查询完成的合约信息保存到本地文件，今日登录可直接使用不再查询
             self.saveInstrument()
-            print("self.dictProduct ",self.dictProduct.keys())
-            print("self.dictExchange ",self.dictExchange.keys())
+
+            self.product_print()
 
             event = Event(type_=EVENT_LOG)
-            log = u'合约信息查询完成'
+            log = u'合约信息查询完成!'
             event.dict_['log'] = log
             self.ee.put(event)            
 
@@ -454,8 +506,11 @@ class MainEngine:
     #----------------------------------------------------------------------
     def saveInstrument(self):
         """保存合约属性数据"""
-        f = shelve.open('instrument')
+        f = shelve.open(self.pluspath+'instrument')
         f['instrument'] = self.dictInstrument
         f['product'] = self.dictProduct
+        f['exchange'] = self.dictExchange
+        f['volinstrument'] = self.volInstrument
+        f['subinstrument'] = self.subInstrument
         f['date'] = date.today()
         f.close()

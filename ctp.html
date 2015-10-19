@@ -78,12 +78,13 @@
             idTimer = 1
 
             def event_log(_msg):
-                add_log(_msg['log'])
+                add_log('['+_msg['_account_']+'] '+_msg['log'])
 
             def event_product(_msg):
                 _doc = document['marketdata']
                 _dict = _msg['data']
                 storage['product_list'] = json.dumps(_dict.keys())
+                add_log(str(_dict))
                 for k,v in _dict.items():
                     if k in storage.get('sub_product',['IF']):
                         _min = ''
@@ -196,10 +197,14 @@
                 add_log("服务器端断开连接,3秒后尝试重连")
                 idTimer = timer.set_timeout(reconnect, 3000)
 
+            def show_storage(ev):
+                add_log(str(storage.items()))
+
             ws.bind('message',ws_msg)
             ws.bind('close',ws_disconnected)
             ws.bind('open',ws_open)
             ws.bind('error',ws_error)
+            document['restart'].bind('click',show_storage)
 </script>
     <button id="restart">重启</button>
 
