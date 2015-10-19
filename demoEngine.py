@@ -63,9 +63,10 @@ class MainEngine:
         self.dictExchange= {}
         self.volInstrument = {}
         self.subInstrument = set()
+        self.subedInst = set()
+
         self.ee.register(EVENT_INSTRUMENT, self.insertInstrument)
         
-        self.ee.register(EVENT_TIMER,       self.getAccountPosition)
         self.ee.register(EVENT_TRADE,       self.get_trade)
         self.ee.register(EVENT_ORDER,       self.get_order)
         self.ee.register(EVENT_TICK,        self.get_tick)
@@ -86,11 +87,7 @@ class MainEngine:
             try:
                 _ws.send(_data)
             except Exception,e:
-                print(e)
-    def check_timer(self):
-        if time()>self.__timer:
-            self.ee.addEventTimer()
-            self.__timer = time()+1
+                print(_data,e)
     def get_order(self,event):
         _data = event.dict_['data']
         if _data['OrderStatus'] == '5':
@@ -225,7 +222,6 @@ class MainEngine:
         _ref = self.td.sendOrder(self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
         self.__orders[_ref] = (self.symbol,self.exchangeid,price,pricetype,volume,direction,offset)
     def get_tick(self,event):
-        self.check_timer()
         _data = event.dict_['data']
         self.ask = _data['AskPrice1']
         self.bid = _data['BidPrice1']
@@ -316,13 +312,16 @@ class MainEngine:
     #----------------------------------------------------------------------
     def subscribe(self, instrumentid, exchangeid):
         """订阅合约"""
-        self.md.subscribe(instrumentid, exchangeid)
+        if instrumentid not in self.subedInst:
+            self.md.subscribe(str(instrumentid), str(exchangeid))
+            self.subedInst.add(instrumentid)
 
     def sub_instrument(self,inst_id):
+        print(inst_id)
         if inst_id in self.dictInstrument:
             exch_id = self.dictInstrument[inst_id]['ExchangeID']
-            self.subInstrument.add(inst_id)
             self.subscribe(inst_id,exch_id)
+            self.subInstrument.add(inst_id)
             event = Event(type_=EVENT_LOG)
             log = u'订阅合约: %s'%inst_id
             event.dict_['log'] = log
@@ -339,8 +338,8 @@ class MainEngine:
                         _minDate = _date
                         _minID = k
                 exch_id = self.dictInstrument[_minID]['ExchangeID']
-                self.subInstrument.add(inst_id)
                 self.subscribe(_minID,exch_id)
+                self.subInstrument.add(inst_id)
                 event = Event(type_=EVENT_LOG)
                 log = u'订阅(主力)合约: %s'%_minID
                 event.dict_['log'] = log
@@ -394,12 +393,10 @@ class MainEngine:
         """在交易服务器登录成功后，开始初始化查询"""
         # 打开设定文件setting.vn
         self.getInstrument()
+        self.ee.register(EVENT_TIMER,       self.getAccountPosition)
 #        _exchangeid = self.dictInstrument[self.symbol]['ExchangeID']
-        for _inst in self.subInstrument:
+        for _inst in list(self.subInstrument):
             self.sub_instrument(_inst)
-    #----------------------------------------------------------------------
-    def addEventTimer(self):
-        self.ee.addEventTimer()
     #----------------------------------------------------------------------
     def getInstrument(self):
         """获取合约"""

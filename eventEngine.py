@@ -3,6 +3,8 @@
 # 系统模块
 from Queue import Queue, Empty
 from threading import Thread
+from time import sleep
+from thread import start_new_thread as th_fork
 
 # 第三方模块
 #from PyQt4.QtCore import QTimer
@@ -60,7 +62,6 @@ class EventEngine:
         # 事件引擎开关
         self.__active = False
 
-        
         # 事件处理线程
         self.__thread = Thread(target = self.__run)
         
@@ -74,7 +75,8 @@ class EventEngine:
 
         if _DEBUG_:
             self.save = shelve.open("debug_event_types")
-        
+
+        self.addEventTimer()
     #----------------------------------------------------------------------
     def runit(self,event):self.__process(event)
     def __run(self):
@@ -94,18 +96,24 @@ class EventEngine:
         if event.type_ in self.__handlers:
             #若存在，则按顺序将事件传递给处理函数执行
             [handler(event) for handler in self.__handlers[event.type_]]
-            
+
+            if event.repeat>0:
+                th_fork(self.repeatEvent,(event,))
+
             #以上语句为Python列表解析方式的写法，对应的常规循环写法为：
             #for handler in self.__handlers[event.type_]:
                 #handler(event)    
                
     #----------------------------------------------------------------------
-#    def __onTimer(self):
+    def repeatEvent(self,event):
+        sleep(event.repeat)
+        self.put(event)
+
     def addEventTimer(self):
         """向事件队列中存入计时器事件"""
         # 创建计时器事件
         event = Event(type_=EVENT_TIMER)
-        
+        event.repeat = 1
         # 向队列中存入计时器事件
         self.put(event)    
 
@@ -184,6 +192,7 @@ class Event:
         """Constructor"""
         self.type_ = type_      # 事件类型
         self.dict_ = {}         # 字典用于保存具体的事件数据
+        self.repeat = 0
 
 
 #----------------------------------------------------------------------
