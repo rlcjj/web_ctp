@@ -69,10 +69,10 @@
 
             if 'ctp_server' in storage:
                 add_log("服务器地址:"+storage['ctp_server'])
-                address = 'ws://'+storage['ctp_server']+":8080/websocket"
+                address = 'ws://'+storage['ctp_server']+":9789/websocket"
             else:
                 add_log("服务器地址:本地")
-                address = 'ws://localhost:8080/websocket'
+                address = 'ws://localhost:9789/websocket'
 
             ws = websocket.WebSocket(address)
             idTimer = 1
