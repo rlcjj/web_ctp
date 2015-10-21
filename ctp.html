@@ -89,39 +89,54 @@
 
             DirectionDict = {"0":"买","1":"卖"}
             DirectionStyle = {"0":{"color":"red"},"1":{"color":"green"}}
-            CombOffsetFlagDict = {"0":"开仓","3":"平仓"}
+            OffsetFlagDict = {"0":"开仓","3":"平仓"}
             Orders = []
             def event_order(_msg):
                 global Orders
                 _doc = document['order']
                 _dict = _msg['data']
-                _doc <= ''
-                _id = "_order_{}_{}".format(_msg['_account_'],_dict['OrderRef'])
-                _str = str(datetime.datetime.now())[11:19]+" [ {} ] {}:{} {} 已成({}) 全部({}) {}".format(_msg['_account_'],DirectionDict.get(_dict['Direction'],"未知方向"),'%.2f'%float(_dict['LimitPrice']),CombOffsetFlagDict.get(_dict['CombOffsetFlag'],"未知开平"),_dict['VolumeTraded'],_dict['VolumeTotalOriginal'],_dict['StatusMsg'])
+                _id = "order_{}_{}".format(_msg['_account_'],_dict['OrderRef'])
+                _str = str(datetime.datetime.now())[11:19]+" [ {} ] {} {}:{} {} 手数:{} {}".format(_msg['_account_'],_dict['InstrumentID'],DirectionDict.get(_dict['Direction'],"未知方向"),'%.2f'%float(_dict['LimitPrice']),OffsetFlagDict.get(_dict['CombOffsetFlag'],"未知开平"),_dict['VolumeTotalOriginal'],_dict['StatusMsg'])
                 _content = html.LABEL(_str)
                 _content.style = DirectionStyle.get(_dict['Direction'],{})
                 some = html.DIV(_content,id=_id)
                 some.style={"text-align":"left"}
                 if Orders and Orders[0].id == _id:
-                    Orders = [some]+Orders[1:]
+                    Orders = [some]+Orders[1:count]
                 else:
-                    Orders = [some]+Orders
+                    Orders = [some]+Orders[:count]
                 _doc.clear()
                 for one in Orders:
                     _doc <= one
                 change_color(_id)
 
+            Trades = []
             def event_trade(_msg):
+                global Trades
                 _doc = document['trade']
                 _dict = _msg['data']
-                _doc <= str(_dict)
-                _doc <= html.HR()
+                _id = "trade_{}_{}".format(_msg['_account_'],_dict['OrderRef'])
+                _str = str(datetime.datetime.now())[11:19]+" [ {} ] {} {} {} 成交手数:{} 成交价:{}".format(_msg['_account_'],_dict['InstrumentID'],DirectionDict.get(_dict['Direction'],"未知方向"),OffsetFlagDict.get(_dict['OffsetFlag'],"未知开平"),_dict['Volume'],'%.2f'%float(_dict['Price']))
+                _content = html.LABEL(_str)
+                _content.style = DirectionStyle.get(_dict['Direction'],{})
+                some = html.DIV(_content,id=_id)
+                some.style={"text-align":"left"}
+                if Trades and Trades[0].id == _id:
+                    Trades = [some]+Trades[1:count]
+                else:
+                    Trades = [some]+Trades[:count]
+                _doc.clear()
+                for one in Trades:
+                    _doc <= one
+                change_color(_id)
 
+            Ticks = []
             def event_tick(_msg):
+                global Ticks
                 _doc = document['marketdata']
                 _l = _doc.children
                 _data = _msg['data']
-                _id = "marketdata"+_data['InstrumentID']
+                _id = "tick_{}".format(_data['InstrumentID'])
                 _content = width_label(_data['InstrumentID'],100)
                 _content += width_label("叫卖1",50)+width_label(_data["AskPrice1"],50)+width_label(_data["AskVolume1"],50)
                 _content += width_label("叫买1",50)+width_label(_data["BidPrice1"],50)+width_label(_data["BidVolume1"],50)
@@ -132,37 +147,85 @@
                 _content += width_label(_data["UpdateTime"],50)
                 some = html.DIV(_content,id=_id)
                 some.style={"text-align":"left"}
-                _doc.clear()
                 haved = False
-                for one in _l[:count]:
-                    if one.id==_id:
+                _out = []
+                for one in Ticks:
+                    if one.id == _id:
                         haved = True
-                        _doc <= some
+                        _out = [some]+_out
                     else:
-                        _doc <= one
+                        _out = [one]+_out
                 if not haved:
-                    _doc <= some
+                    _out = [some]+_out
+                Ticks = _out
+                _doc.clear()
+                for one in Ticks:
+                    _doc <= one
                 change_color(_id)
 
-            def update_account(_msg):
-                _doc = document['account']
-                _data = _msg['data']
-                _id = "account"+_msg['_account_']
-                _l = _doc.children
-                _str = width_label("12311.11",100)+width_label("123.11",100)
-                _doc.clear()
-                some = html.DIV(_str)
+            Positions = set()
+            PosDict = {}
+            def event_position(_msg):
+                global Positions
+                global PosDict
+                _doc = document['position']
+                _dict = _msg['data']
+                _id = "position_{}_{}".format(_msg['_account_'],_dict['PosiDirection'])
+                _id0 = "position_{}_0".format(_msg['_account_'])
+                Positions.add(_id0)
+                _id1 = "position_{}_1".format(_msg['_account_'])
+                Positions.add(_id1)
+                _str = ''
+                _str+= width_label("帐号",30)
+                _str+= width_label(_msg['_account_'],50)
+                _str+= width_label("持仓",50)
+                _str+= width_label(_dict['Position'],80)
+                _content = html.LABEL(_str)
+                _content.style = DirectionStyle.get(_dict['PosiDirection'],{})
+                some = html.DIV(_content,id=_id)
                 some.style={"text-align":"left"}
-                _l=[some]+_l
-                for one in _l[:count]:
-                    _doc<=one
+                PosDict[_id] = some
+                _doc.clear()
+                for one in Positions:
+                    if one in PosDict:
+                        _doc <= PosDict[one]
+                change_color(_id)
+
+            Accounts = set()
+            AccDict = {}
+            def event_account(_msg):
+                global Accounts
+                global AccDict
+                _doc = document['account']
+                _dict = _msg['data']
+                _id = "account_{}".format(_msg['_account_'])
+                Accounts.add(_id)
+                _str = ''
+                _str+= width_label("帐号",30)
+                _str+= width_label(_msg['_account_'],50)
+                _str+= width_label("持仓盈亏",50)
+                _str+= width_label('%.2f'%float(_dict['PositionProfit']),80)
+                _str+= width_label("可用",50)
+                _str+= width_label('%.2f'%float(_dict['Available']),80)
+                _str+= width_label("净值",50)
+                _str+= width_label('%.2f'%float(_dict['Balance']),80)
+                _content = html.LABEL(_str)
+                some = html.DIV(_content,id=_id)
+                some.style={"text-align":"left"}
+                AccDict[_id] = some
+                _doc.clear()
+                for one in Accounts:
+                    _doc <= AccDict[one]
+                change_color(_id)
 
             funcs={
             EVENT_LOG:event_log,
+            EVENT_TICK:event_tick,
             EVENT_ORDER:event_order,
             EVENT_TRADE:event_trade,
+            EVENT_ACCOUNT:event_account,
+            EVENT_POSITION:event_position,
             EVENT_PRODUCT:event_product,
-            EVENT_TICK:event_tick,
             }
 
             def ws_msg(ev):
@@ -183,7 +246,7 @@
                         if v<240:
                             document[k].set_style({"background":"#{:x}{:x}{:x}".format(v,v,v)})
                             _background[k] = v+1
-                rafId = raf(loop)
+                #rafId = raf(loop)
 
             def step_one():
                 if 'ctp_account' in storage:
@@ -200,6 +263,7 @@
                 add_log("确认帐户信息")
                 document['marketdata'].clear()
                 document['account'].clear()
+                document['position'].clear()
                 document['trade'].clear()
                 document['order'].clear()
                 timer.set_timeout(step_three, 1000)
@@ -223,20 +287,12 @@
                 add_log("服务器端断开连接,3秒后尝试重连")
                 idTimer = timer.set_timeout(reconnect, 3000)
 
-            def show_storage(ev):
-                _doc = document['order']
-                _l = ''
-                for one in _doc.children:
-                    _l=_l+'.'+one.id
-                alert(str(_l))
-
             ws.bind('message',ws_msg)
             ws.bind('close',ws_disconnected)
             ws.bind('open',ws_open)
             ws.bind('error',ws_error)
             document['restart'].bind('click',show_storage)
 </script>
-    <button id="restart">重启</button>
 
 <main role="main" class="grid-container">
 <div class="grid-100 mobile-grid-100">
@@ -250,6 +306,13 @@
   <section class="example-block">
         <p><b>帐户信息</b></p>
         <div style="margin:10px;" id="account"/>
+    <span class="dynamic-px-width"></span>
+  </section>
+</div>
+<div class="grid-100 mobile-grid-100">
+  <section class="example-block">
+        <p><b>帐户持仓</b></p>
+        <div style="margin:10px;" id="position"/>
     <span class="dynamic-px-width"></span>
   </section>
 </div>
