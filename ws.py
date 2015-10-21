@@ -6,6 +6,7 @@ from webbrowser import open_new_tab
 from demoEngine import MainEngine
 import json,time,shelve,os
 from string import lowercase as _chars
+from time import sleep
 
 cs = set()
 me = {}
@@ -26,20 +27,13 @@ def ws_ctpaccount(data):
     for k,v in account.items():
         if k not in me:
             _plus = make_plus(v['userid'])
-            me[k] = MainEngine(cs,v,_plus)
+            me[k] = MainEngine(cs,v,_plus,useZmq = True)
             print("account "+k+" started")
 
 def ws_getinstrument(data):
     for one in me.values():
         one.sub_instrument(data)
 
-timeskip = 0
-def addTimer(data):
-    global timeskip
-    if time.time()-timeskip>=1:
-        timeskip = time.time()
-        for one in me.values():
-            one.addEventTimer()
 
 @get('/')
 def index():

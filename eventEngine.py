@@ -76,7 +76,7 @@ class EventEngine:
         if _DEBUG_:
             self.save = shelve.open("debug_event_types")
 
-        self.addEventTimer()
+#        self.addEventTimer()
     #----------------------------------------------------------------------
     def runit(self,event):self.__process(event)
     def __run(self):
@@ -175,8 +175,10 @@ class EventEngine:
     #----------------------------------------------------------------------
     def put(self, event):
         """向事件队列中存入事件"""
+
         event.dict_['_type_'] = event.type_
         event.dict_['_account_'] = self.__account.get('userid','NONE_USERID')
+
         self.__queue.put(event)
 
         if _DEBUG_:

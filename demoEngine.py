@@ -10,7 +10,9 @@
 import sys
 from datetime import date
 from time import sleep,time
-import shelve,json
+import shelve
+import json
+import zmq
 
 #from PyQt4 import QtCore
 
@@ -23,7 +25,7 @@ class MainEngine:
     """主引擎，负责对API的调度"""
 
     #----------------------------------------------------------------------
-    def __init__(self, ws, account, _plus_path, justCopySignal=False):
+    def __init__(self, ws, account, _plus_path, justCopySignal=False, useZmq = False, zmqServer = "tcp://192.168.1.234:9999"):
         """Constructor
         :type self: object
         """
@@ -40,13 +42,19 @@ class MainEngine:
         self.symbol = None
         self.socket = None
         self.websocket = ws             # websocket list to send msg
-        self.md = DemoMdApi(self.ee, self.mdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)    # 创建API接口
-        self.td = DemoTdApi(self.ee, self.tdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)
+
+        if useZmq:
+            context = zmq.Context()
+            socket = context.socket(zmq.REQ)
+            socket.connect(zmqServer)
+            self.socket = socket
 
         self.ee.start()                 # 启动事件驱动引擎
         self.havedposi = False
         self.position = {}
         self.todayposition = {}
+        self.lastError = 0
+        self.lastTodo = 0
 
         self.__timer = time()+60
         self.__orders = {}
@@ -65,8 +73,11 @@ class MainEngine:
         self.subInstrument = set()
         self.subedInst = set()
 
-        self.ee.register(EVENT_INSTRUMENT, self.insertInstrument)
-        
+        self.todo = 0
+
+        self.ee.register(EVENT_ERROR,       self.get_error)
+        self.ee.register(EVENT_INSTRUMENT,  self.insertInstrument)
+        self.ee.register(EVENT_TIMER,       self.getAccountPosition)
         self.ee.register(EVENT_TRADE,       self.get_trade)
         self.ee.register(EVENT_ORDER,       self.get_order)
         self.ee.register(EVENT_TICK,        self.get_tick)
@@ -77,17 +88,25 @@ class MainEngine:
             if 'EVENT_' in k and v[0]!='_':
                 self.ee.register(v,self.websocket_send)
 
-        self.login()
+        self.md = DemoMdApi(self.ee, self.mdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)    # 创建API接口
+        self.td = DemoTdApi(self.ee, self.tdaddress, self.userid, self.password, self.brokerid,plus_path=_plus_path)
 
     def set_ws(self,ws):
         self.websocket = ws
     def websocket_send(self,event):
-        _data = json.dumps(event.dict_,ensure_ascii=False)
-        for _ws in self.websocket:
-            try:
-                _ws.send(_data)
-            except Exception,e:
-                print(_data,e)
+        try:
+            _data = json.dumps(event.dict_,ensure_ascii=False)
+            for _ws in self.websocket:
+                try:
+                    _ws.send(_data)
+                except Exception,e:
+                    print(_data,e)
+        except Exception,e:
+            print(event.dict_,e)
+    def get_error(self,event):
+        print(event.dict_['log'])
+        print(event.dict_['ErrorID'])
+        self.lastError = event.dict_['ErrorID']
     def get_order(self,event):
         _data = event.dict_['data']
         if _data['OrderStatus'] == '5':
@@ -124,7 +143,7 @@ class MainEngine:
             self.__orders[_ref] = (_saved[0],_saved[1],price,_saved[3],_saved[4],_saved[5],_saved[6])
     def get_trade(self,event):
         _data = event.dict_['data']
-        print('get_trade',_data['OrderRef'])
+        print('get_trade',int(_data['OrderRef']),self.todo)
         _done = _data['Volume']
         if int(_data['OrderRef']) in self.__orders:
             _saved = self.__orders.pop(int(_data['OrderRef']))
@@ -158,10 +177,6 @@ class MainEngine:
                 price = float(_saved[2])-0.2
             _ref = self.td.sendOrder(_saved[0],_saved[1],price,_saved[3],_goon,_saved[5],_saved[6])
             self.__orders[_ref] = (_saved[0],_saved[1],price,_saved[3],_goon,_saved[5],_saved[6])
-    def set_symbol(self,_s):
-        self.symbol = _s
-    def set_socket(self,_s):
-        self.socket = _s
     def get_position(self,event):
         _data = event.dict_['data']
         if _data['TodayPosition']:
@@ -176,7 +191,7 @@ class MainEngine:
         event.dict_['log'] = log
         self.ee.put(event)
         self.__retry = 0
-        self.countGet = 0
+        self.countGet = -5
         offset = defineDict['THOST_FTDC_OF_Open']
         pricetype = defineDict['THOST_FTDC_OPT_LimitPrice']
         if tr>0:
@@ -193,7 +208,7 @@ class MainEngine:
         event.dict_['log'] = log
         self.ee.put(event)
         self.__retry = 0
-        self.countGet = 0
+        self.countGet = -5
         offset = defineDict['THOST_FTDC_OF_Close']
         pricetype = defineDict['THOST_FTDC_OPT_LimitPrice']
         if tr<0:
@@ -210,7 +225,7 @@ class MainEngine:
         event.dict_['log'] = log
         self.ee.put(event)
         self.__retry = 0
-        self.countGet = 0
+        self.countGet = -5
         offset = defineDict['THOST_FTDC_OF_CloseToday']
         pricetype = defineDict['THOST_FTDC_OPT_LimitPrice']
         if tr<0:
@@ -232,10 +247,16 @@ class MainEngine:
             else:
                 self.socket.send(bytes(str(price)))
         else:
-            return(0)
+            return
         _bk = int(self.socket.recv())
+        if self.symbol[:2] in ['IF','IH','IC'] and _data['UpdateTime'][:4]=='15:1':
+            _bk = 0
         self.todo = _bk
-#        print '%.0f  %s  =  %d'%(time(),_data['LastPrice'],_bk)
+        if self.lastError in [31,50]:
+            if self.lastTodo == self.todo:
+                return
+            else:
+                self.lastTodo = self.todo
         if self.__orders:
             print(self.__orders)
         elif self.havedposi:
@@ -302,10 +323,6 @@ class MainEngine:
     #----------------------------------------------------------------------
     def login(self):
         """登陆"""
-        event = Event(type_=EVENT_LOG)
-        log = u'启动登陆...'
-        event.dict_['log'] = log
-        self.ee.put(event)
         self.td.login()
         self.md.login()
     
@@ -317,11 +334,12 @@ class MainEngine:
             self.subedInst.add(instrumentid)
 
     def sub_instrument(self,inst_id):
-        print(inst_id)
         if inst_id in self.dictInstrument:
             exch_id = self.dictInstrument[inst_id]['ExchangeID']
             self.subscribe(inst_id,exch_id)
             self.subInstrument.add(inst_id)
+            self.symbol = str(inst_id)
+            self.exchangeid = str(exch_id)
             event = Event(type_=EVENT_LOG)
             log = u'订阅合约: %s'%inst_id
             event.dict_['log'] = log
@@ -339,6 +357,8 @@ class MainEngine:
                         _minID = k
                 exch_id = self.dictInstrument[_minID]['ExchangeID']
                 self.subscribe(_minID,exch_id)
+                self.symbol = str(_minID)
+                self.exchangeid = str(exch_id)
                 self.subInstrument.add(inst_id)
                 event = Event(type_=EVENT_LOG)
                 log = u'订阅(主力)合约: %s'%_minID
@@ -377,15 +397,15 @@ class MainEngine:
         self.countGet = self.countGet + 1
         
         # 每1秒发一次查询
-        if self.countGet >= 5:
-            if self.countGet>20:
-                self.countGet = 5
-            if self.lastGet == 'Account':
-                self.lastGet = 'Position'
-                self.getPosition()
-            else:
-                self.lastGet = 'Account'
-                self.getAccount()
+        if self.countGet > 0:
+            if self.countGet>2:
+                self.countGet = 0
+                if self.lastGet == 'Account':
+                    self.lastGet = 'Position'
+                    self.getPosition()
+                else:
+                    self.lastGet = 'Account'
+                    self.getAccount()
         else:
             self.getPosition()
     #----------------------------------------------------------------------
@@ -393,7 +413,7 @@ class MainEngine:
         """在交易服务器登录成功后，开始初始化查询"""
         # 打开设定文件setting.vn
         self.getInstrument()
-        self.ee.register(EVENT_TIMER,       self.getAccountPosition)
+        self.ee.addEventTimer()
 #        _exchangeid = self.dictInstrument[self.symbol]['ExchangeID']
         for _inst in list(self.subInstrument):
             self.sub_instrument(_inst)
@@ -443,14 +463,6 @@ class MainEngine:
         data = event.dict_['data']
         last = event.dict_['last']
 
-        _new = {}
-        for k,v in data.items():
-            if type(v) == type(''):
-                _new[k] = v.decode('GBK')
-            else:
-                _new[k] = v
-        data = _new
-
         if data['ProductID'] not in self.dictProduct:
             self.dictProduct[data['ProductID']] = {}
         if data['ExchangeID'] not in self.dictExchange:
@@ -489,6 +501,8 @@ class MainEngine:
         return instrument
     
     #----------------------------------------------------------------------
+    def exitEvent(self,e):
+        self = None
     def exit(self):
         """退出"""
         # 销毁API对象

@@ -5,14 +5,22 @@
 主要对API进行了一定程度的简化封装，方便开发。
 """
 
-import os
-import zmq
 from vnctpmd import MdApi
 from vnctptd import TdApi
 from eventEngine import *
 from ctp_data_type import defineDict
-from datetime import datetime
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
+
+def utf_dict(d):
+    _d = {}
+    for k,v in d.items():
+        if type(v)==type(''):
+            _d[k] = v.decode('gbk')
+        else:
+            _d[k] = v
+    return _d
+
 def print_dict(d):
     """打印API收到的字典，该函数主要用于开发时的debug"""
     print '-'*60
@@ -20,9 +28,8 @@ def print_dict(d):
     l.sort()
     for key in l:
         print key, ':', d[key]
-    
 
-########################################################################
+
 class DemoMdApi(MdApi):
     """
     Demo中的行情API封装
@@ -53,11 +60,33 @@ class DemoMdApi(MdApi):
         self.__address = address
         # 以下集合用于重连后自动订阅之前已订阅的合约，使用集合为了防止重复
         self.__setSubscribed = set()
-        
-        # 初始化.con文件的保存目录为\mdconnection，注意这个目录必须已存在，否则会报错
-        self.createFtdcMdApi('md%s'%plus_path)
 
-    #----------------------------------------------------------------------
+        self.plus_path = plus_path
+        self.connect_server()
+
+    # ----------------------------------------------------------------------
+
+    def connect_server(self):
+        # 初始化.con文件的保存目录为\mdconnection，注意这个目录必须已存在，否则会报错
+        self.createFtdcMdApi('md%s'%self.plus_path)
+        # 注册服务器地址
+        self.registerFront(self.__address)
+        # 初始化连接，成功会调用onFrontConnected
+        self.init()
+
+    # ----------------------------------------------------------------------
+
+    def login(self):
+        """连接服务器"""
+        req = {}
+        req['UserID'] = self.__userid
+        req['Password'] = self.__password
+        req['BrokerID'] = self.__brokerid
+        self.__reqid = self.__reqid + 1
+        self.reqUserLogin(req, self.__reqid)
+
+    # ----------------------------------------------------------------------
+
     def onFrontConnected(self):
         """服务器连接"""
 
@@ -65,25 +94,16 @@ class DemoMdApi(MdApi):
         event.dict_['log'] = u'行情服务器连接成功'
         self.__eventEngine.put(event)
 
-        # 如果用户已经填入了用户名等等，则自动尝试连接
-        if self.__userid:
-            req = {}
-            req['UserID'] = self.__userid
-            req['Password'] = self.__password
-            req['BrokerID'] = self.__brokerid
-            self.__reqid = self.__reqid + 1
-            self.reqUserLogin(req, self.__reqid)
-            
-    #----------------------------------------------------------------------  
+        self.login()
+
+    #----------------------------------------------------------------------
     def onFrontDisconnected(self, n):
         """服务器断开"""
-        raise Exception("MD#onFrontDisconnected")
         event = Event(type_=EVENT_LOG)
         event.dict_['log'] = u'行情服务器连接断开'
         self.__eventEngine.put(event)
         
-        self.login(self.__address, self.__userid, self.__password, self.__brokerid)
-    #---------------------------------------------------------------------- 
+    #----------------------------------------------------------------------
     def onHeartBeatWarning(self, n):
         """心跳报警"""
         # 因为API的心跳报警比较常被触发，且与API工作关系不大，因此选择忽略
@@ -117,9 +137,9 @@ class DemoMdApi(MdApi):
         self.__eventEngine.put(event)
         
         ## 重连后自动订阅之前已经订阅过的合约
-        #if self.__setSubscribed:
-            #for instrument in self.__setSubscribed:
-                #self.subscribe(instrument[0], instrument[1])
+        if self.__setSubscribed:
+            for instrument in self.__setSubscribed:
+                self.subscribe(instrument[0], instrument[1])
                 
     #---------------------------------------------------------------------- 
     def onRspUserLogout(self, data, error, n, last):
@@ -171,15 +191,6 @@ class DemoMdApi(MdApi):
         pass        
         
     #----------------------------------------------------------------------
-    def login(self):
-        """连接服务器"""
-        # 注册服务器地址
-        self.registerFront(self.__address)
-        
-        # 初始化连接，成功会调用onFrontConnected
-        self.init()
-        
-    #----------------------------------------------------------------------
     def subscribe(self, instrumentid, exchangeid):
         """订阅合约"""
         self.subscribeMarketData(instrumentid)
@@ -224,36 +235,52 @@ class DemoTdApi(TdApi):
         
         # 合约字典（保存合约查询数据）
         self.__dictInstrument = {}
-        
+
+        self.plus_path = plus_path
+
+        self.connect_server()
+
+    def connect_server(self):
         # 初始化.con文件的保存目录为\tdconnection
-        self.createFtdcTraderApi('td%s'%plus_path)
-        
-    #----------------------------------------------------------------------
+        self.createFtdcTraderApi('td%s'%self.plus_path)
+        # 数据重传模式设为从开始
+        #       QUICK
+        self.subscribePrivateTopic(2)
+        self.subscribePublicTopic(2)
+        # 注册服务器地址
+        self.registerFront(self.__address)
+        # 初始化连接，成功会调用onFrontConnected
+        self.init()
+
+    # ----------------------------------------------------------------------
+
+    def login(self):
+        """连接服务器"""
+        req = {}
+        req['UserID'] = self.__userid
+        req['Password'] = self.__password
+        req['BrokerID'] = self.__brokerid
+        self.__reqid = self.__reqid + 1
+        self.reqUserLogin(req, self.__reqid)
+
+    # ----------------------------------------------------------------------
+
     def onFrontConnected(self):
         """服务器连接"""
         event = Event(type_=EVENT_LOG)
         event.dict_['log'] = u'交易服务器连接成功'
         self.__eventEngine.put(event)
-        
-        # 如果用户已经填入了用户名等等，则自动尝试连接
-        if self.__userid:
-            req = {}
-            req['UserID'] = self.__userid
-            req['Password'] = self.__password
-            req['BrokerID'] = self.__brokerid
-            self.__reqid = self.__reqid + 1
-            self.reqUserLogin(req, self.__reqid)
-    
+
+        self.login()
+
     #----------------------------------------------------------------------
     def onFrontDisconnected(self, n):
         """服务器断开"""
-        raise Exception("TD#onFrontDisconnected")
+
         event = Event(type_=EVENT_LOG)
         event.dict_['log'] = u'交易服务器连接断开'
         self.__eventEngine.put(event)
 
-        self.login(self.__address, self.__userid, self.__password, self.__brokerid)
-    
     #----------------------------------------------------------------------
     def onHeartBeatWarning(self, n):
         """"""
@@ -312,6 +339,12 @@ class DemoTdApi(TdApi):
         event.dict_['log'] = log
         self.__eventEngine.put(event)   
     
+        event1 = Event(type_=EVENT_ERROR)
+        log = u' 发单错误回报，错误代码：' + unicode(error['ErrorID']) + u',' + u'错误信息：' + error['ErrorMsg'].decode('gbk')
+        event1.dict_['log'] = log
+        event1.dict_['ErrorID'] = int(error['ErrorID'])
+        self.__eventEngine.put(event1)
+
     #----------------------------------------------------------------------
     def onRspParkedOrderInsert(self, data, error, n, last):
         """"""
@@ -330,6 +363,12 @@ class DemoTdApi(TdApi):
         event.dict_['log'] = log
         self.__eventEngine.put(event)
     
+        event1 = Event(type_=EVENT_ERROR)
+        log = u'撤单错误回报，错误代码：' + unicode(error['ErrorID']) + u',' + u'错误信息：' + error['ErrorMsg'].decode('gbk')
+        event1.dict_['log'] = log
+        event1.dict_['ErrorID'] = int(error['ErrorID'])
+        self.__eventEngine.put(event1)
+
     #----------------------------------------------------------------------
     def onRspQueryMaxOrderVolume(self, data, error, n, last):
         """"""
@@ -426,7 +465,7 @@ class DemoTdApi(TdApi):
         """
         if error['ErrorID'] == 0:
             event = Event(type_=EVENT_INSTRUMENT)
-            event.dict_['data'] = data
+            event.dict_['data'] = utf_dict(data)
             event.dict_['last'] = last
             self.__eventEngine.put(event)
         else:
@@ -753,7 +792,7 @@ class DemoTdApi(TdApi):
         
         # 常规报单事件
         event1 = Event(type_=EVENT_ORDER)
-        event1.dict_['data'] = data
+        event1.dict_['data'] = utf_dict(data)
         self.__eventEngine.put(event1)
 
     #----------------------------------------------------------------------
@@ -761,7 +800,7 @@ class DemoTdApi(TdApi):
         """成交回报"""
         # 常规成交事件
         event1 = Event(type_=EVENT_TRADE)
-        event1.dict_['data'] = data
+        event1.dict_['data'] = utf_dict(data)
         self.__eventEngine.put(event1)
         
     #----------------------------------------------------------------------
@@ -780,20 +819,6 @@ class DemoTdApi(TdApi):
         event.dict_['log'] = log
         self.__eventEngine.put(event)
     
-    #----------------------------------------------------------------------
-    def login(self):
-        """连接服务器"""
-        # 数据重传模式设为从开始
-        #       QUICK
-        self.subscribePrivateTopic(2)       
-        self.subscribePublicTopic(2)            
-        
-        # 注册服务器地址
-        self.registerFront(self.__address)
-        
-        # 初始化连接，成功会调用onFrontConnected
-        self.init()    
-        
     #----------------------------------------------------------------------
     def getInstrument(self):
         """查询合约"""
@@ -887,7 +912,7 @@ class DemoTdApi(TdApi):
         """持仓查询回报"""
         if error['ErrorID'] == 0:
             event = Event(type_=EVENT_POSITION)
-            event.dict_['data'] = data
+            event.dict_['data'] = utf_dict(data)
             self.__eventEngine.put(event)
             
         else:
@@ -901,7 +926,7 @@ class DemoTdApi(TdApi):
         """资金账户查询回报"""
         if error['ErrorID'] == 0:
             event = Event(type_=EVENT_ACCOUNT)
-            event.dict_['data'] = data
+            event.dict_['data'] = utf_dict(data)
             self.__eventEngine.put(event)
         else:
             event = Event(type_=EVENT_LOG)
@@ -914,7 +939,7 @@ class DemoTdApi(TdApi):
         """投资者查询回报"""
         if error['ErrorID'] == 0:
             event = Event(type_=EVENT_INVESTOR)
-            event.dict_['data'] = data
+            event.dict_['data'] = utf_dict(data)
             self.__eventEngine.put(event)
         else:
             event = Event(type_=EVENT_LOG)

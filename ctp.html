@@ -87,6 +87,36 @@
                 add_log(str(_dict))
                 ws.send("ws_getinstrument=IF_master")
 
+            DirectionDict = {"0":"买","1":"卖"}
+            DirectionStyle = {"0":{"color":"red"},"1":{"color":"green"}}
+            CombOffsetFlagDict = {"0":"开仓","3":"平仓"}
+            Orders = []
+            def event_order(_msg):
+                global Orders
+                _doc = document['order']
+                _dict = _msg['data']
+                _doc <= ''
+                _id = "_order_{}_{}".format(_msg['_account_'],_dict['OrderRef'])
+                _str = str(datetime.datetime.now())[11:19]+" [ {} ] {}:{} {} 已成({}) 全部({}) {}".format(_msg['_account_'],DirectionDict.get(_dict['Direction'],"未知方向"),'%.2f'%float(_dict['LimitPrice']),CombOffsetFlagDict.get(_dict['CombOffsetFlag'],"未知开平"),_dict['VolumeTraded'],_dict['VolumeTotalOriginal'],_dict['StatusMsg'])
+                _content = html.LABEL(_str)
+                _content.style = DirectionStyle.get(_dict['Direction'],{})
+                some = html.DIV(_content,id=_id)
+                some.style={"text-align":"left"}
+                if Orders and Orders[0].id == _id:
+                    Orders = [some]+Orders[1:]
+                else:
+                    Orders = [some]+Orders
+                _doc.clear()
+                for one in Orders:
+                    _doc <= one
+                change_color(_id)
+
+            def event_trade(_msg):
+                _doc = document['trade']
+                _dict = _msg['data']
+                _doc <= str(_dict)
+                _doc <= html.HR()
+
             def event_tick(_msg):
                 _doc = document['marketdata']
                 _l = _doc.children
@@ -129,6 +159,8 @@
 
             funcs={
             EVENT_LOG:event_log,
+            EVENT_ORDER:event_order,
+            EVENT_TRADE:event_trade,
             EVENT_PRODUCT:event_product,
             EVENT_TICK:event_tick,
             }
@@ -192,7 +224,11 @@
                 idTimer = timer.set_timeout(reconnect, 3000)
 
             def show_storage(ev):
-                add_log(str(storage.items()))
+                _doc = document['order']
+                _l = ''
+                for one in _doc.children:
+                    _l=_l+'.'+one.id
+                alert(str(_l))
 
             ws.bind('message',ws_msg)
             ws.bind('close',ws_disconnected)
