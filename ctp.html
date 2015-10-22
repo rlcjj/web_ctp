@@ -96,7 +96,7 @@
                 _doc = document['order']
                 _dict = _msg['data']
                 _id = "order_{}_{}".format(_msg['_account_'],_dict['OrderRef'])
-                _str = str(datetime.datetime.now())[11:19]+" [ {} ] {} {}:{} {} 手数:{} {}".format(_msg['_account_'],_dict['InstrumentID'],DirectionDict.get(_dict['Direction'],"未知方向"),'%.2f'%float(_dict['LimitPrice']),OffsetFlagDict.get(_dict['CombOffsetFlag'],"未知开平"),_dict['VolumeTotalOriginal'],_dict['StatusMsg'])
+                _str = str(datetime.datetime.now())[11:19]+" [ {} ] {} 报{}价:{} {} 手数:{} {}".format(_msg['_account_'],_dict['InstrumentID'],DirectionDict.get(_dict['Direction'],"未知方向"),'%.2f'%float(_dict['LimitPrice']),OffsetFlagDict.get(_dict['CombOffsetFlag'],"未知开平"),_dict['VolumeTotalOriginal'],_dict['StatusMsg'])
                 _content = html.LABEL(_str)
                 _content.style = DirectionStyle.get(_dict['Direction'],{})
                 some = html.DIV(_content,id=_id)
@@ -165,7 +165,7 @@
 
             PosAccount = set()
             PosInst = set()
-            PosDir = set()
+            PosDir = ["2","3"]
             PosDict = {}
             def event_position(_msg):
                 global PosAccount
@@ -177,7 +177,6 @@
                 _id = "position_{}_{}_{}".format(_msg['_account_'],_dict['InstrumentID'],_dict['PosiDirection'])
                 PosAccount.add(_msg['_account_'])
                 PosInst.add(_dict['InstrumentID'])
-                PosDir.add(_dict['PosiDirection'])
                 _str = ''
                 _str += width_label("帐号",30)
                 _str += width_label(_msg['_account_'],80)
